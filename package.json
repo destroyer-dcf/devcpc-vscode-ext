@@ -26,7 +26,9 @@
         "color": "#d7ede1"
     },
     "activationEvents": [
-        "*"
+        "onView:devcpcTasks",
+        "workspaceContains:**/devcpc.conf",
+        "workspaceContains:**/.vscode/taskcpc.json"
     ],
     "main": "./out/extension",
     "contributes": {
