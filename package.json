@@ -1,0 +1,73 @@
+{
+    "name": "devcpc-tasks",
+    "displayName": "DevCPC",
+    "description": "VS Code extension to view and run DevCPC tasks from Explorer pane",
+    "icon": "devcpc.png",
+    "version": "0.1.0",
+    "publisher": "Destroyer",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/destroyer-dcf/devcpc-vscode-ext.git"
+    },
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "tasks",
+        "devcpc",
+        "amstrad",
+        "cpc",
+        "build"
+    ],
+    "galleryBanner": {
+        "color": "#d7ede1"
+    },
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/extension",
+    "contributes": {
+        "views": {
+            "explorer": [
+                {
+                    "id": "devcpcTasks",
+                    "name": "DevCPC"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "devcpcTasks.executeTask",
+                "title": "Execute"
+            },
+            {
+                "command": "devcpcTasks.refresh",
+                "title": "Refresh",
+                "icon": "assets/refresh_icon.svg"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "devcpcTasks.refresh",
+                    "group": "navigation"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/mocha": "^2.2.42",
+        "@types/node": "^16.x",
+        "@types/vscode": "^1.60.0",
+        "typescript": "^4.5.0",
+        "tslint": "^5.8.0"
+    }
+}
