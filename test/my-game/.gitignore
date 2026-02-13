@@ -1,0 +1,25 @@
+# Archivos generados
+obj/
+dist/
+*.bin
+*.lst
+*.map
+*.ihx
+*.lk
+*.noi
+*.rel
+*.sym
+
+# ASM generados automáticamente (sprites)
+asm/sprites.asm
+src/sprites.asm
+
+# Backups
+*.backup
+*.backup_build
+*.bak
+*.BAK
+
+# Sistema
+.DS_Store
+Thumbs.db

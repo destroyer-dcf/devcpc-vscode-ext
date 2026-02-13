@@ -1,0 +1,2 @@
+Hello, from DevCPC! This is a sample text file included in your project.
+You can modify or delete it as needed.

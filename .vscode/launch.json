@@ -25,7 +25,7 @@
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
-                "/Users/destroyer/PROJECTS/CPCReady/CPCDevKit/examples/basic"
+                "test/my-game"
             ],
             "outFiles": [
                 "${workspaceFolder}/out/test/**/*.js"
