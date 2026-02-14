@@ -1,5 +1,7 @@
 # DevCPC Tasks for VS Code
 
+![Demo](https://raw.githubusercontent.com/destroyer-dcf/devcpc-vscode-ext/main/doc/extension.gif)
+
 VS Code extension to view and run DevCPC tasks directly from the Explorer pane.
 
 This extension adds a "DevCPC" view to your Explorer panel, allowing you to visualize and execute DevCPC tasks configured in your project with a single click. Perfect for developing games and applications for Amstrad CPC.
@@ -11,8 +13,6 @@ This extension adds a "DevCPC" view to your Explorer panel, allowing you to visu
 - **Task Icons**: Visual indicators for different task types (build, clean, run, etc.)
 - **Composite Tasks Support**: Execute complex task chains with dependencies
 - **Auto-Refresh**: Automatically updates the task list when configuration changes
-
-![DevCPC Tasks](https://raw.githubusercontent.com/destroyer-dcf/devcpc-vscode-ext/main/assets/screenshot.png)
 
 ## Requirements
 

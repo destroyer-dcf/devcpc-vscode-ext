@@ -3,7 +3,7 @@
     "displayName": "DevCPC",
     "description": "VS Code extension to view and run DevCPC tasks from Explorer pane",
     "icon": "devcpc.png",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "publisher": "devcpc",
     "repository": {
         "type": "git",
