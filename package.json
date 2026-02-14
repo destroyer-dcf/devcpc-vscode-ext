@@ -4,7 +4,7 @@
     "description": "VS Code extension to view and run DevCPC tasks from Explorer pane",
     "icon": "devcpc.png",
     "version": "0.1.0",
-    "publisher": "Destroyer",
+    "publisher": "devcpc",
     "repository": {
         "type": "git",
         "url": "https://github.com/destroyer-dcf/devcpc-vscode-ext.git"
