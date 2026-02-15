@@ -55,6 +55,7 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
 
     // Recibir mensajes del emulador
     panel.webview.onDidReceiveMessage((msg) => {
+        console.log('Mensaje del emulador:', msg);
         if (msg.command === 'emu_ready') {
             if (state) {
                 state.ready = msg.isReady;
@@ -62,6 +63,8 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
             }
         } else if (msg.command === 'emu_error') {
             vscode.window.showErrorMessage(`Emulador: ${msg.error}`);
+        } else if (msg.command === 'log') {
+            console.log('Emulator log:', msg.text);
         }
     });
 
@@ -83,6 +86,14 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
     panel.webview.html = html;
 
     state = { panel, ready: false };
+
+    // Dar tiempo al webview para cargar y luego enviar comando de boot
+    setTimeout(() => {
+        if (state) {
+            console.log('Enviando comando boot al emulador');
+            state.panel.webview.postMessage({ cmd: 'boot' });
+        }
+    }, 1000);
 }
 
 /**
