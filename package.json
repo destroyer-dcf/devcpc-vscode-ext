@@ -27,6 +27,7 @@
     },
     "activationEvents": [
         "onView:devcpcTasks",
+        "onView:devcpcConfig",
         "workspaceContains:**/devcpc.conf",
         "workspaceContains:**/.vscode/taskcpc.json"
     ],
@@ -37,6 +38,10 @@
                 {
                     "id": "devcpcTasks",
                     "name": "DevCPC"
+                },
+                {
+                    "id": "devcpcConfig",
+                    "name": "DevCPC Config"
                 }
             ]
         },
@@ -49,13 +54,41 @@
                 "command": "devcpcTasks.refresh",
                 "title": "Refresh",
                 "icon": "assets/refresh_icon.svg"
+            },
+            {
+                "command": "devcpc.editConfigVariable",
+                "title": "Editar Variable",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "devcpc.toggleConfigVariable",
+                "title": "Habilitar/Deshabilitar",
+                "icon": "$(circle-slash)"
+            },
+            {
+                "command": "devcpc.refreshConfig",
+                "title": "Refrescar Configuración",
+                "icon": "$(refresh)"
             }
         ],
         "menus": {
             "view/title": [
                 {
                     "command": "devcpcTasks.refresh",
+                    "when": "view == devcpcTasks",
                     "group": "navigation"
+                },
+                {
+                    "command": "devcpc.refreshConfig",
+                    "when": "view == devcpcConfig",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "devcpc.toggleConfigVariable",
+                    "when": "view == devcpcConfig && viewItem == configVariable",
+                    "group": "inline"
                 }
             ]
         }
@@ -66,10 +99,14 @@
         "watch": "tsc -watch -p ./"
     },
     "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
         "@types/mocha": "^2.2.42",
         "@types/node": "^16.x",
         "@types/vscode": "^1.60.0",
-        "typescript": "^4.5.0",
-        "tslint": "^5.8.0"
+        "tslint": "^5.8.0",
+        "typescript": "^4.5.0"
+    },
+    "dependencies": {
+        "js-yaml": "^4.1.1"
     }
 }
