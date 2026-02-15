@@ -1,7 +1,9 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { TaskTreeDataProvider } from './taskProvider'
+import { TaskTreeDataProvider } from './taskProvider';
+import { ConfigTreeProvider } from './configTreeProvider';
+import { ConfigTreeCommands } from './configTreeCommands';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -11,6 +13,25 @@ export function activate(context: vscode.ExtensionContext) {
 
 	vscode.window.registerTreeDataProvider('devcpcTasks', taskTreeDataProvider);
 	vscode.commands.registerCommand('devcpcTasks.refresh', () => taskTreeDataProvider.refresh());
+
+	// Registrar ConfigTreeProvider para devcpc.conf
+	const configTreeProvider = new ConfigTreeProvider();
+	vscode.window.registerTreeDataProvider('devcpcConfig', configTreeProvider);
+
+	// Comandos de configuración
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.editConfigVariable', ConfigTreeCommands.editConfigVariable)
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.refreshConfig', () => configTreeProvider.refresh())
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.toggleConfigVariable', async (item) => {
+			if (item.configPath && item.lineNumber !== undefined) {
+				await ConfigTreeCommands.toggleVariable(item.configPath, item.lineNumber, item.isEnabled);
+			}
+		})
+	);
 
 	vscode.commands.registerCommand('devcpcTasks.executeTask', async function(taskDef: any) {
 		console.log('Ejecutando tarea:', taskDef.label);
