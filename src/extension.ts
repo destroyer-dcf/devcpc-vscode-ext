@@ -194,7 +194,7 @@ function getPanelKind(panel?: string): vscode.TaskPanelKind {
  * Auto-cargar binario en el emulador después de un build exitoso
  */
 async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
-	// Leer configuración para obtener OUTPUT_PATH
+	// Leer configuración para obtener rutas
 	const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
 	if (!configPath) {
 		return;
@@ -203,55 +203,92 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 	try {
 		const content = fs.readFileSync(configPath, 'utf8');
 		const lines = content.split('\n');
-		let outputPath: string | undefined;
+		const config: any = {};
 
+		// Parsear todas las variables de configuración
 		for (const line of lines) {
 			const trimmed = line.trim();
-			if (trimmed.startsWith('OUTPUT_PATH=') && !trimmed.startsWith('#')) {
-				outputPath = trimmed.split('=')[1].trim();
-				break;
+			if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+				const [key, ...valueParts] = trimmed.split('=');
+				const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+				config[key.trim()] = value;
 			}
 		}
 
-		if (!outputPath) {
-			return;
+		// Buscar archivo generado en orden de prioridad: DSK, CDT, BIN
+		let fileToLoad: string | undefined;
+		let fileName: string | undefined;
+
+		// 1. Buscar DSK (lo más común en DevCPC)
+		if (config.DIST_DIR && config.DSK) {
+			const distDir = path.isAbsolute(config.DIST_DIR)
+				? config.DIST_DIR
+				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
+			const dskPath = path.join(distDir, config.DSK);
+			
+			if (fs.existsSync(dskPath)) {
+				fileToLoad = dskPath;
+				fileName = config.DSK;
+			}
 		}
 
-		// Resolver ruta completa
-		const fullOutputPath = path.isAbsolute(outputPath)
-			? outputPath
-			: path.join(workspaceFolder.uri.fsPath, outputPath);
+		// 2. Buscar CDT si no hay DSK
+		if (!fileToLoad && config.DIST_DIR && config.CDT) {
+			const distDir = path.isAbsolute(config.DIST_DIR)
+				? config.DIST_DIR
+				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
+			const cdtPath = path.join(distDir, config.CDT);
+			
+			if (fs.existsSync(cdtPath)) {
+				fileToLoad = cdtPath;
+				fileName = config.CDT;
+			}
+		}
 
-		// Buscar archivos .bin en el directorio de salida
-		if (fs.existsSync(fullOutputPath) && fs.statSync(fullOutputPath).isDirectory()) {
-			const files = fs.readdirSync(fullOutputPath);
-			const binFiles = files.filter(f => f.endsWith('.bin'));
+		// 3. Buscar archivos .bin si no hay DSK/CDT
+		if (!fileToLoad && config.OUTPUT_PATH) {
+			const outputPath = path.isAbsolute(config.OUTPUT_PATH)
+				? config.OUTPUT_PATH
+				: path.join(workspaceFolder.uri.fsPath, config.OUTPUT_PATH);
 
-			if (binFiles.length > 0) {
-				// Tomar el archivo más reciente
-				const binPath = path.join(fullOutputPath, binFiles[0]);
-				
-				// Preguntar al usuario si quiere cargar
-				const answer = await vscode.window.showInformationMessage(
-					`Build completado: ${binFiles[0]}. ¿Cargar en el emulador?`,
-					'Sí',
-					'No'
-				);
+			if (fs.existsSync(outputPath)) {
+				if (fs.statSync(outputPath).isDirectory()) {
+					// Buscar archivos en el directorio
+					const files = fs.readdirSync(outputPath);
+					const cpcFiles = files.filter(f => 
+						f.endsWith('.bin') || f.endsWith('.dsk') || f.endsWith('.cdt')
+					);
 
-				if (answer === 'Sí') {
-					await emulatorLauncher.launchEmulator(context, binPath);
+					if (cpcFiles.length > 0) {
+						// Priorizar .dsk, luego .cdt, luego .bin
+						const dskFile = cpcFiles.find(f => f.endsWith('.dsk'));
+						const cdtFile = cpcFiles.find(f => f.endsWith('.cdt'));
+						const binFile = cpcFiles.find(f => f.endsWith('.bin'));
+						
+						const selectedFile = dskFile || cdtFile || binFile;
+						if (selectedFile) {
+							fileToLoad = path.join(outputPath, selectedFile);
+							fileName = selectedFile;
+						}
+					}
+				} else if (outputPath.match(/\.(bin|dsk|cdt)$/i)) {
+					// Si OUTPUT_PATH es directamente un archivo
+					fileToLoad = outputPath;
+					fileName = path.basename(outputPath);
 				}
 			}
-		} else if (fs.existsSync(fullOutputPath) && fullOutputPath.endsWith('.bin')) {
-			// Si OUTPUT_PATH es directamente un archivo .bin
+		}
+
+		// Si encontramos un archivo, preguntar si quiere cargarlo
+		if (fileToLoad && fileName) {
 			const answer = await vscode.window.showInformationMessage(
-				`Build completado: ${path.basename(fullOutputPath)}. ¿Cargar en el emulador?`,
+				`Build completado: ${fileName}. ¿Cargar en el emulador?`,
 				'Sí',
 				'No'
 			);
 
 			if (answer === 'Sí') {
-				await emulatorLauncher.launchEmulator(context, fullOutputPath);
+				await emulatorLauncher.launchEmulator(context, fileToLoad);
 			}
 		}
 	} catch (error) {

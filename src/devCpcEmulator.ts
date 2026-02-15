@@ -108,60 +108,29 @@ export async function loadBinaryInEmulator(binPath: string): Promise<void> {
     try {
         const ext = path.extname(binPath).toLowerCase();
         
-        // Leer el archivo
-        const fileData = fs.readFileSync(binPath);
-        const dataArray = Array.from(fileData);
-
-        let command: any;
-        const fileName = path.basename(binPath);
-
-        switch (ext) {
-            case '.bin':
-                // Archivo binario, cargar en memoria directamente
-                command = {
-                    command: 'load_binary',
-                    data: dataArray,
-                    startAddress: 0x4000, // Dirección por defecto para CPC
-                    fileName: fileName
-                };
-                break;
-
-            case '.dsk':
-                // Imagen de disco
-                command = {
-                    command: 'insert_disk',
-                    data: dataArray,
-                    fileName: fileName
-                };
-                break;
-
-            case '.cdt':
-                // Cinta (cassette)
-                command = {
-                    command: 'insert_tape',
-                    data: dataArray,
-                    fileName: fileName
-                };
-                break;
-
-            case '.sna':
-                // Snapshot
-                command = {
-                    command: 'load_snapshot',
-                    data: dataArray,
-                    fileName: fileName
-                };
-                break;
-
-            default:
-                vscode.window.showErrorMessage(`Formato no soportado: ${ext}`);
-                return;
+        // Validar formato soportado
+        if (!['.bin', '.dsk', '.cdt', '.sna'].includes(ext)) {
+            vscode.window.showErrorMessage(`Formato no soportado: ${ext}`);
+            return;
         }
 
-        // Enviar al emulador
-        state.panel.webview.postMessage(command);
+        // Leer el archivo
+        const fileData = fs.readFileSync(binPath);
+        
+        // Convertir a base64 (el emulador KC CPC espera base64)
+        const dataBase64 = fileData.toString('base64');
+        const fileName = path.basename(binPath);
+
+        // Enviar al emulador usando el comando 'load' estándar de KC IDE
+        // El emulador detecta automáticamente el tipo de archivo (DSK, CDT, SNA, etc.)
+        state.panel.webview.postMessage({
+            cmd: 'load',
+            data: dataBase64
+        });
 
         vscode.window.showInformationMessage(`Cargado: ${fileName}`);
+        
+        console.log(`Archivo cargado en emulador: ${fileName} (${ext})`);
     } catch (error) {
         vscode.window.showErrorMessage(`Error cargando archivo: ${error}`);
     }
@@ -176,7 +145,7 @@ export function resetEmulator(): void {
         return;
     }
 
-    state.panel.webview.postMessage({ command: 'reset' });
+    state.panel.webview.postMessage({ cmd: 'reset' });
     vscode.window.showInformationMessage('Emulador reseteado');
 }
 
