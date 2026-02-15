@@ -1,0 +1,120 @@
+general:
+  PROJECT_NAME:
+    type: string
+    description: "Nombre del proyecto (usado para el DSK)"
+  BUILD_LEVEL:
+    type: number
+    description: "Nivel de compilación (0-4)"
+    options:
+      - value: 0
+        description: "Todas las funcionalidades (MEMORY 23599)"
+      - value: 1
+        description: "Juegos de laberintos (MEMORY 24999)"
+      - value: 2
+        description: "Juegos con scroll (MEMORY 24799)"
+      - value: 3
+        description: "Juegos pseudo-3D (MEMORY 23999)"
+      - value: 4
+        description: "Sin scroll/layout +500 bytes (MEMORY 25299)"
+
+rutas:
+  ASM_PATH:
+    type: string
+    description: "Ruta al código ensamblador 8BP"
+  BASIC_PATH:
+    type: string
+    description: "Ruta a archivos BASIC (se añaden automáticamente al DSK)"
+  RAW_PATH:
+    type: string
+    description: "Ruta a archivos RAW (se añaden al DSK sin encabezado AMSDOS)"
+  C_PATH:
+    type: string
+    description: "Ruta a código C (se compila con SDCC si existe)"
+  C_SOURCE:
+    type: string
+    description: "Archivo fuente C principal"
+  C_CODE_LOC:
+    type: number
+    description: "Dirección de memoria para código C"
+  BAS_SOURCE:
+    type: string
+    description: "Archivo .bas a compilar"
+  BAS_LOADADDR:
+    type: string
+    description: "Dirección de carga del BASIC"
+
+salida:
+  OBJ_DIR:
+    type: string
+    description: "Directorio para archivos intermedios (bin, lst, map, ihx)"
+  DIST_DIR:
+    type: string
+    description: "Directorio para la imagen DSK final"
+  DSK:
+    type: string
+    description: "Nombre de la imagen DSK"
+  CDT:
+    type: string
+    description: "Nombre del archivo CDT"
+  CDT_FILES:
+    type: string
+    description: "Lista de archivos a incluir en la cinta (separados por espacios)"
+  CPR:
+    type: string
+    description: "Nombre del archivo CPR (cartucho)"
+  CPR_EXECUTE:
+    type: string
+    description: "Archivo a ejecutar al arrancar el cartucho"
+
+
+emulador:
+  RUN_MODE:
+    type: string
+    description: "Modo de ejecución"
+    options:
+      - value: auto
+        description: "Usa CDT si existe, sino DSK"
+      - value: dsk
+        description: "Siempre usa DSK (disco)"
+      - value: cdt
+        description: "Siempre usa CDT (cinta)"
+  RVM_PATH:
+    type: string
+    description: "Ruta al ejecutable de Retro Virtual Machine"
+  CPC_MODEL:
+    type: number
+    description: "Modelo de CPC"
+    options:
+      - value: 464
+      - value: 664
+      - value: 6128
+  RUN_FILE:
+    type: string
+    description: "Archivo a ejecutar automáticamente"
+
+graficos:
+  MODE:
+    type: number
+    description: "Modo CPC para la conversión"
+    options:
+      - value: 0
+        description: "160x200, 16 colores"
+      - value: 1
+        description: "320x200, 4 colores"
+      - value: 2
+        description: "640x200, 2 colores"
+  SPRITES_PATH:
+    type: string
+    description: "Ruta donde están los PNG de sprites"
+  SPRITES_OUT_FILE:
+    type: string
+    description: "Archivo ASM de salida para sprites"
+  SPRITES_TOLERANCE:
+    type: number
+    description: "Tolerancia RGB por canal (0=exacto, 8=recomendado, -1=automático)"
+  SPRITES_TRANSPARENT_INK:
+    type: number
+    description: "INK para píxeles transparentes (0-26)"
+  LOADER_SCREEN:
+    type: string
+    description: "Ruta donde están los PNG de pantallas de carga"

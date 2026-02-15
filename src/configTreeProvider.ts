@@ -3,6 +3,19 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
+
+interface VarDefinition {
+    type: string;
+    description: string;
+    options?: Array<{ value: any; description?: string }>;
+}
+
+interface VarsSchema {
+    [section: string]: {
+        [varName: string]: VarDefinition;
+    };
+}
 
 export class ConfigTreeItem extends vscode.TreeItem {
     constructor(
@@ -13,7 +26,8 @@ export class ConfigTreeItem extends vscode.TreeItem {
         public readonly value?: string,
         public readonly isEnabled?: boolean,
         public readonly lineNumber?: number,
-        public readonly configPath?: string
+        public readonly configPath?: string,
+        public readonly varDefinition?: VarDefinition
     ) {
         super(label, collapsibleState);
 
@@ -23,8 +37,21 @@ export class ConfigTreeItem extends vscode.TreeItem {
                 isEnabled ? 'check' : 'circle-slash',
                 isEnabled ? undefined : new vscode.ThemeColor('disabledForeground')
             );
-            this.description = value || '(vacío)';
-            this.tooltip = `${varName}\n${isEnabled ? 'Habilitado' : 'Deshabilitado'}\nValor: ${value || '(vacío)'}`;
+            this.description = value || '(no definido)';
+            
+            // Tooltip mejorado con descripción de vars.yml
+            let tooltipText = `${varName}\n${isEnabled ? 'Habilitado' : 'Deshabilitado'}\nValor: ${value || '(no definido)'}`;
+            if (varDefinition) {
+                tooltipText += `\n\n${varDefinition.description}`;
+                tooltipText += `\nTipo: ${varDefinition.type}`;
+                if (varDefinition.options && varDefinition.options.length > 0) {
+                    tooltipText += '\n\nOpciones:';
+                    varDefinition.options.forEach(opt => {
+                        tooltipText += `\n  - ${opt.value}${opt.description ? ': ' + opt.description : ''}`;
+                    });
+                }
+            }
+            this.tooltip = tooltipText;
             
             this.command = {
                 command: 'devcpc.editConfigVariable',
@@ -43,6 +70,7 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
     readonly onDidChangeTreeData: vscode.Event<ConfigTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private workspaceRoot: string | undefined;
+    private varsSchema: VarsSchema | null = null;
 
     constructor() {
         this.workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -52,6 +80,22 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
         watcher.onDidChange(() => this.refresh());
         watcher.onDidCreate(() => this.refresh());
         watcher.onDidDelete(() => this.refresh());
+        
+        // Cargar el esquema de vars.yml
+        this.loadVarsSchema();
+    }
+
+    private loadVarsSchema(): void {
+        try {
+            const varsPath = path.join(__dirname, '..', 'vars.yml');
+            if (fs.existsSync(varsPath)) {
+                const varsContent = fs.readFileSync(varsPath, 'utf8');
+                this.varsSchema = yaml.load(varsContent) as VarsSchema;
+            }
+        } catch (error) {
+            console.error('Error cargando vars.yml:', error);
+            vscode.window.showErrorMessage('Error cargando vars.yml');
+        }
     }
 
     refresh(): void {
@@ -134,103 +178,120 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
     }
 
     private getSections(configPath: string): ConfigTreeItem[] {
-        const content = fs.readFileSync(configPath, 'utf8');
-        const lines = content.split('\n');
-        const sections: ConfigTreeItem[] = [];
-        const sectionMap = new Map<string, boolean>();
-
-        // Primera sección por defecto (antes de cualquier cabecera)
-        sectionMap.set('General', true);
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const trimmed = line.trim();
-            
-            // Detectar cabeceras de sección: # ============
-            if (trimmed.startsWith('# ===') || trimmed.startsWith('# ====')) {
-                // Buscar la línea siguiente que contiene el nombre de la sección
-                if (i + 1 < lines.length) {
-                    const nextLine = lines[i + 1].trim();
-                    if (nextLine.startsWith('#') && !nextLine.startsWith('# ===')) {
-                        // Es el nombre de la sección
-                        const sectionName = nextLine.substring(1).trim();
-                        if (!sectionMap.has(sectionName)) {
-                            sectionMap.set(sectionName, true);
-                        }
-                    }
-                }
-            }
+        if (!this.varsSchema) {
+            return [new ConfigTreeItem(
+                'Error: No se pudo cargar vars.yml',
+                vscode.TreeItemCollapsibleState.None,
+                'section'
+            )];
         }
 
-        // Crear items de sección
-        sectionMap.forEach((_, sectionName) => {
+        const sections: ConfigTreeItem[] = [];
+        
+        // Crear items de sección desde vars.yml
+        for (const sectionName in this.varsSchema) {
+            // Capitalizar el nombre de la sección
+            const displayName = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
             sections.push(new ConfigTreeItem(
-                sectionName,
+                displayName,
                 vscode.TreeItemCollapsibleState.Expanded,
                 'section'
             ));
-        });
+        }
 
         return sections;
     }
 
     private getVariablesFromSection(configPath: string, sectionName: string): ConfigTreeItem[] {
+        if (!this.varsSchema) {
+            return [];
+        }
+
+        // Buscar la sección en el schema (case-insensitive)
+        const sectionKey = Object.keys(this.varsSchema).find(
+            key => key.toLowerCase() === sectionName.toLowerCase()
+        );
+
+        if (!sectionKey) {
+            return [];
+        }
+
+        const sectionVars = this.varsSchema[sectionKey];
+        const variables: ConfigTreeItem[] = [];
+
+        // Leer el contenido del devcpc.conf para obtener valores
+        const configValues = this.parseConfigFile(configPath);
+
+        // Para cada variable definida en vars.yml
+        for (const varName in sectionVars) {
+            const varDef = sectionVars[varName];
+            const configValue = configValues.get(varName);
+
+            let value = '';
+            let isEnabled = false;
+            let lineNumber = -1;
+
+            if (configValue) {
+                value = configValue.value;
+                isEnabled = configValue.enabled;
+                lineNumber = configValue.lineNumber;
+            }
+
+            variables.push(new ConfigTreeItem(
+                varName,
+                vscode.TreeItemCollapsibleState.None,
+                'variable',
+                varName,
+                value || '(no definido)',
+                isEnabled,
+                lineNumber,
+                configPath,
+                varDef
+            ));
+        }
+
+        return variables;
+    }
+
+    private parseConfigFile(configPath: string): Map<string, { value: string; enabled: boolean; lineNumber: number }> {
+        const result = new Map<string, { value: string; enabled: boolean; lineNumber: number }>();
+        
+        if (!fs.existsSync(configPath)) {
+            return result;
+        }
+
         const content = fs.readFileSync(configPath, 'utf8');
         const lines = content.split('\n');
-        const variables: ConfigTreeItem[] = [];
-        
-        let inSection = (sectionName === 'General'); // General es la sección inicial
-        let currentSection = 'General';
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
 
-            // Detectar inicio de sección: # ==== seguido de nombre
-            if (trimmed.startsWith('# ===') || trimmed.startsWith('# ====')) {
-                if (i + 1 < lines.length) {
-                    const nextLine = lines[i + 1].trim();
-                    if (nextLine.startsWith('#') && !nextLine.startsWith('# ===')) {
-                        currentSection = nextLine.substring(1).trim();
-                        inSection = (currentSection === sectionName);
-                    }
-                }
-                continue;
-            }
-
-            // Saltar líneas vacías y comentarios puros
+            // Saltar líneas vacías y comentarios puros (sin =)
             if (!trimmed || (trimmed.startsWith('#') && !trimmed.includes('='))) {
                 continue;
             }
 
-            // Si estamos en la sección correcta, buscar variables
-            if (inSection) {
-                const isCommented = trimmed.startsWith('#');
-                const cleanLine = isCommented ? trimmed.substring(1).trim() : trimmed;
+            const isCommented = trimmed.startsWith('#');
+            const cleanLine = isCommented ? trimmed.substring(1).trim() : trimmed;
 
-                // Detectar variables (formato VAR=VALUE)
-                const match = cleanLine.match(/^([A-Z_]+)=(.*)$/);
-                if (match) {
-                    const varName = match[1];
-                    let value = match[2].trim();
-                    
-                    // Limpiar comillas
-                    value = value.replace(/^["']|["']$/g, '');
+            // Detectar variables (formato VAR=VALUE)
+            const match = cleanLine.match(/^([A-Z_]+)=(.*)$/);
+            if (match) {
+                const varName = match[1];
+                let value = match[2].trim();
+                
+                // Limpiar comillas
+                value = value.replace(/^["']|["']$/g, '');
 
-                    variables.push(new ConfigTreeItem(
-                        varName,
-                        vscode.TreeItemCollapsibleState.None,
-                        'variable',
-                        varName,
-                        value,
-                        !isCommented,
-                        i,
-                        configPath
-                    ));
-                }
+                result.set(varName, {
+                    value: value,
+                    enabled: !isCommented,
+                    lineNumber: i
+                });
             }
         }
 
-        return variables;
+        return result;
     }
 }
