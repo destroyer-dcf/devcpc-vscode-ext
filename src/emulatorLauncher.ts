@@ -71,6 +71,8 @@ function findConfigPath(rootPath: string): string | undefined {
  * Lanzar el emulador según la configuración EMULATOR_TYPE
  */
 export async function launchEmulator(context: vscode.ExtensionContext, binaryPath?: string): Promise<void> {
+    console.log('[EmulatorLauncher] launchEmulator called with binaryPath:', binaryPath);
+    
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No hay workspace abierto');
@@ -79,16 +81,23 @@ export async function launchEmulator(context: vscode.ExtensionContext, binaryPat
 
     const configPath = findConfigPath(workspaceFolder.uri.fsPath);
     if (!configPath) {
-        vscode.window.showErrorMessage('No se encontró devcpc.conf en el workspace');
+        console.log('[EmulatorLauncher] No se encontró devcpc.conf, usando emulador integrado por defecto');
+        await launchIntegratedEmulator(context, binaryPath);
         return;
     }
+
+    console.log('[EmulatorLauncher] Config path:', configPath);
 
     const config = parseConfigFile(configPath);
     const emulatorType = config['EMULATOR_TYPE']?.toLowerCase() || 'integrated';
 
+    console.log('[EmulatorLauncher] EMULATOR_TYPE:', emulatorType);
+
     if (emulatorType === 'rvm') {
+        console.log('[EmulatorLauncher] Lanzando RVM...');
         await launchRvmEmulator(config, binaryPath);
     } else if (emulatorType === 'integrated') {
+        console.log('[EmulatorLauncher] Lanzando emulador integrado...');
         await launchIntegratedEmulator(context, binaryPath);
     } else {
         vscode.window.showErrorMessage(`Tipo de emulador desconocido: ${emulatorType}`);
@@ -134,19 +143,30 @@ async function launchRvmEmulator(config: ConfigValues, binaryPath?: string): Pro
  * Lanzar el emulador integrado (KC CPC)
  */
 async function launchIntegratedEmulator(context: vscode.ExtensionContext, binaryPath?: string): Promise<void> {
+    console.log('[EmulatorLauncher] launchIntegratedEmulator called');
+    console.log('[EmulatorLauncher] binaryPath:', binaryPath);
+    console.log('[EmulatorLauncher] isEmulatorActive:', devCpcEmulator.isEmulatorActive());
+    
     // Inicializar el emulador si no está activo
     if (!devCpcEmulator.isEmulatorActive()) {
+        console.log('[EmulatorLauncher] Inicializando emulador...');
         await devCpcEmulator.initEmulator(context);
         
         // Esperar a que esté listo si hay un binario para cargar
         if (binaryPath) {
+            console.log('[EmulatorLauncher] Esperando 2 segundos para que el emulador esté listo...');
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
+    } else {
+        console.log('[EmulatorLauncher] Emulador ya está activo');
     }
     
     // Cargar el binario si se proporcionó
     if (binaryPath) {
+        console.log('[EmulatorLauncher] Cargando archivo:', binaryPath);
         await devCpcEmulator.loadBinaryInEmulator(binaryPath);
+    } else {
+        console.log('[EmulatorLauncher] No hay archivo para cargar');
     }
 }
 

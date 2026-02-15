@@ -213,11 +213,16 @@ function getPanelKind(panel?: string): vscode.TaskPanelKind {
  * Auto-cargar binario en el emulador después de un build exitoso
  */
 async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+	console.log('[DevCPC] autoLoadBinaryAfterBuild iniciado');
+	
 	// Leer configuración para obtener rutas
 	const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
 	if (!configPath) {
+		console.log('[DevCPC] No se encontró devcpc.conf');
 		return;
 	}
+
+	console.log('[DevCPC] Config encontrado en:', configPath);
 
 	try {
 		const content = fs.readFileSync(configPath, 'utf8');
@@ -234,6 +239,8 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 			}
 		}
 
+		console.log('[DevCPC] Configuración parseada:', JSON.stringify(config, null, 2));
+
 		// Buscar archivo generado en orden de prioridad: DSK, CDT, BIN
 		let fileToLoad: string | undefined;
 		let fileName: string | undefined;
@@ -245,9 +252,14 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
 			const dskPath = path.join(distDir, config.DSK);
 			
+			console.log('[DevCPC] Buscando DSK en:', dskPath);
+			
 			if (fs.existsSync(dskPath)) {
 				fileToLoad = dskPath;
 				fileName = config.DSK;
+				console.log('[DevCPC] DSK encontrado:', dskPath);
+			} else {
+				console.log('[DevCPC] DSK no existe en esa ruta');
 			}
 		}
 
@@ -258,9 +270,14 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
 			const cdtPath = path.join(distDir, config.CDT);
 			
+			console.log('[DevCPC] Buscando CDT en:', cdtPath);
+			
 			if (fs.existsSync(cdtPath)) {
 				fileToLoad = cdtPath;
 				fileName = config.CDT;
+				console.log('[DevCPC] CDT encontrado:', cdtPath);
+			} else {
+				console.log('[DevCPC] CDT no existe en esa ruta');
 			}
 		}
 
@@ -270,6 +287,8 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 				? config.OUTPUT_PATH
 				: path.join(workspaceFolder.uri.fsPath, config.OUTPUT_PATH);
 
+			console.log('[DevCPC] Buscando en OUTPUT_PATH:', outputPath);
+
 			if (fs.existsSync(outputPath)) {
 				if (fs.statSync(outputPath).isDirectory()) {
 					// Buscar archivos en el directorio
@@ -277,6 +296,8 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 					const cpcFiles = files.filter(f => 
 						f.endsWith('.bin') || f.endsWith('.dsk') || f.endsWith('.cdt')
 					);
+
+					console.log('[DevCPC] Archivos CPC encontrados:', cpcFiles);
 
 					if (cpcFiles.length > 0) {
 						// Priorizar .dsk, luego .cdt, luego .bin
@@ -288,18 +309,22 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 						if (selectedFile) {
 							fileToLoad = path.join(outputPath, selectedFile);
 							fileName = selectedFile;
+							console.log('[DevCPC] Archivo seleccionado:', fileToLoad);
 						}
 					}
 				} else if (outputPath.match(/\.(bin|dsk|cdt)$/i)) {
 					// Si OUTPUT_PATH es directamente un archivo
 					fileToLoad = outputPath;
 					fileName = path.basename(outputPath);
+					console.log('[DevCPC] OUTPUT_PATH es archivo directo:', fileToLoad);
 				}
 			}
 		}
 
 		// Si encontramos un archivo, preguntar si quiere cargarlo
 		if (fileToLoad && fileName) {
+			console.log('[DevCPC] Preguntando al usuario si quiere cargar:', fileName);
+			
 			const answer = await vscode.window.showInformationMessage(
 				`Build completado: ${fileName}. ¿Cargar en el emulador?`,
 				'Sí',
@@ -307,11 +332,16 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 			);
 
 			if (answer === 'Sí') {
+				console.log('[DevCPC] Usuario aceptó, lanzando emulador...');
 				await emulatorLauncher.launchEmulator(context, fileToLoad);
+			} else {
+				console.log('[DevCPC] Usuario canceló');
 			}
+		} else {
+			console.log('[DevCPC] No se encontró ningún archivo para cargar');
 		}
 	} catch (error) {
-		console.error('Error en autoLoadBinaryAfterBuild:', error);
+		console.error('[DevCPC] Error en autoLoadBinaryAfterBuild:', error);
 	}
 }
 
