@@ -20,6 +20,7 @@
     "exclude": [
         "node_modules",
         ".vscode-test",
-        "src/test"
+        "src/test",
+        "vscode-kcide-main"
     ]
 }

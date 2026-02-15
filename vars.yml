@@ -68,6 +68,14 @@ salida:
 
 
 emulador:
+  EMULATOR_TYPE:
+    type: string
+    description: "Tipo de emulador a usar"
+    options:
+      - value: rvm
+        description: "Retro Virtual Machine (externo, más potente)"
+      - value: integrated
+        description: "KC CPC WASM (integrado en VSCode)"
   RUN_MODE:
     type: string
     description: "Modo de ejecución"

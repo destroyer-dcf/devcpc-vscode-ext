@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { TaskTreeDataProvider } from './taskProvider';
 import { ConfigTreeProvider } from './configTreeProvider';
 import { ConfigTreeCommands } from './configTreeCommands';
+import * as devCpcEmulator from './devCpcEmulator';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -30,6 +31,28 @@ export function activate(context: vscode.ExtensionContext) {
 			if (item.configPath && item.lineNumber !== undefined) {
 				await ConfigTreeCommands.toggleVariable(item.configPath, item.lineNumber, item.isEnabled);
 			}
+		})
+	);
+
+	// Comandos del emulador integrado
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.openIntegratedEmulator', async () => {
+			await devCpcEmulator.initEmulator(context);
+		})
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.resetEmulator', () => {
+			devCpcEmulator.resetEmulator();
+		})
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.focusEmulator', () => {
+			devCpcEmulator.focusEmulator();
+		})
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpc.closeEmulator', () => {
+			devCpcEmulator.closeEmulator();
 		})
 	);
 

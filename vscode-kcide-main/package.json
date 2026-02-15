@@ -1,0 +1,235 @@
+{
+  "name": "vscode-kcide",
+  "private": "true",
+  "displayName": "KC IDE",
+  "description": "8-bit Assembly IDE (for KC85/3, KC85/4, C64 and CPC)",
+  "version": "2.2.1",
+  "author": "Andre Weissflog",
+  "publisher": "floooh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/floooh/vscode-kcide"
+  },
+  "extensionDependencies": [
+    "ms-vscode.wasm-wasi-core"
+  ],
+  "license": "MIT",
+  "bugs": "https://github.com/floooh/vscode-kcide/issues",
+  "homepage": "https://github.com/floooh/vscode-kcide",
+  "keywords": [
+    "retro-computing",
+    "assembler",
+    "kc85",
+    "kc85/3",
+    "kc85/4",
+    "amstrad",
+    "commodore",
+    "c64",
+    "cpc",
+    "z80",
+    "6502",
+    "ide"
+  ],
+  "icon": "media/kc85-logo.png",
+  "galleryBanner": {
+    "color": "#000000",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Debuggers",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "workspaceContains:kcide.project.json"
+  ],
+  "main": "./dist/web/extension.js",
+  "browser": "./dist/web/extension.js",
+  "preview": false,
+  "contributes": {
+    "commands": [
+      {
+        "command": "floooh.kcide.build",
+        "category": "KCIDE",
+        "title": "Build"
+      },
+      {
+        "command": "floooh.kcide.debug",
+        "category": "KCIDE",
+        "title": "Debug"
+      },
+      {
+        "command": "floooh.kcide.openEmulator",
+        "category": "KCIDE",
+        "title": "Open Emulator"
+      },
+      {
+        "command": "floooh.kcide.bootEmulator",
+        "category": "KCIDE",
+        "title": "Reboot Emulator"
+      },
+      {
+        "command": "floooh.kcide.resetEmulator",
+        "category": "KCIDE",
+        "title": "Reset Emulator"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "category": "KCIDE",
+        "title": "Focus Emulator Panel"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "floooh.kcide.build",
+        "key": "f7",
+        "when": "(editorLangId === 'asm') && (debugState === 'inactive') && (activeWebviewPanel !== 'kcide_emu')"
+      },
+      {
+        "command": "floooh.kcide.debug",
+        "key": "f5",
+        "when": "(editorLangId === 'asm') && (debugState === 'inactive') && (activeWebviewPanel !== 'kcide_emu')"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f1",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f2",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f3",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f4",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f5",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f6",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f7",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f8",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f9",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f10",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f11",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      },
+      {
+        "command": "floooh.kcide.focusEmulator",
+        "key": "f12",
+        "when": "activeWebviewPanelId === 'kcide_emu'"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "url": "./media/kcide.project.schema.json",
+        "fileMatch": [
+          "kcide.project.json"
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "asm",
+        "aliases": [
+          "assembly",
+          "z80",
+          "asm"
+        ],
+        "extensions": [
+          "asm"
+        ],
+        "configuration": "./media/language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "asm",
+        "scopeName": "source.asm",
+        "path": "./media/asm.tmGrammar.json"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "asm"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "kcide",
+        "languages": [
+          "asm"
+        ],
+        "label": "KC IDE Debugger"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run clean && npm run lint && npm run compile",
+    "clean": "rimraf out dist",
+    "compile": "webpack --mode production",
+    "compile-dev": "webpack --mode development",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts && tsc --noEmit",
+    "publish": "vsce publish",
+    "release": "release-it"
+  },
+  "devDependencies": {
+    "@release-it/keep-a-changelog": "^5.0.0",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "20.14.8",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.1",
+    "@typescript-eslint/parser": "^7.13.1",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^8.52.0",
+    "glob": "^10.4.2",
+    "mocha": "^10.4.0",
+    "release-it": "^17.4.0",
+    "rimraf": "^5.0.7",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.5.2",
+    "webpack": "^5.92.1",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@vscode/debugadapter": "^1.68.0",
+    "@vscode/wasm-wasi": "^1.0.1",
+    "await-notify": "^1.0.1",
+    "process": "^0.11.10",
+    "url": "^0.11.4"
+  }
+}

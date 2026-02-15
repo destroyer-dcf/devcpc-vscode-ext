@@ -1,0 +1,74 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://github.com/floooh/vscode-kcide/project",
+    "title": "KC IDE Project",
+    "descripten": "VSCode KC IDE Extension project file schema",
+    "type": "object",
+    "properties": {
+        "emulator": {
+            "description": "Emulator properties",
+            "type": "object",
+            "properties": {
+                "system": {
+                    "description": "Target computer system",
+                    "type": "string",
+                    "default": "KC85/4",
+                    "enum": [ "KC85/3", "KC85/4", "C64", "CPC6128" ]
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "system"
+            ]
+        },
+        "assembler": {
+            "description": "Assembler properties",
+            "type": "object",
+            "properties": {
+                "srcDir": {
+                    "description": "Source code root directory",
+                    "type": "string",
+                    "default": "src"
+                },
+                "mainSourceFile": {
+                    "description": "Filename of the main source file",
+                    "type": "string",
+                    "default": "main.asm"
+                },
+                "cpu": {
+                    "description": "Default CPU type for assembly code",
+                    "type": "string",
+                    "default": "Z80",
+                    "enum": [ "Z80", "6502" ]
+                },
+                "outDir": {
+                    "description": "Output directory",
+                    "type": "string",
+                    "default": "build"
+                },
+                "outBaseFilename": {
+                    "description": "Base filename of output files",
+                    "type": "string",
+                    "default": "out"
+                },
+                "outFiletype": {
+                    "description": "Output filetype",
+                    "type": "string",
+                    "default": "KCC",
+                    "enum": [ "KCC", "PRG", "AMSDOS_BIN" ]
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "srcDir",
+                "mainSourceFile",
+                "cpu",
+                "outDir",
+                "outBaseFilename",
+                "outFiletype"
+            ]
+        }
+    },
+    "additionalProperties": false,
+    "required": [ "assembler", "emulator" ]
+}

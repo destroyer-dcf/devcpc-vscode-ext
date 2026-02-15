@@ -69,6 +69,27 @@
                 "command": "devcpc.refreshConfig",
                 "title": "Refrescar Configuración",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "devcpc.openIntegratedEmulator",
+                "category": "DevCPC",
+                "title": "Open Integrated Emulator",
+                "icon": "$(device-desktop)"
+            },
+            {
+                "command": "devcpc.resetEmulator",
+                "category": "DevCPC",
+                "title": "Reset Emulator"
+            },
+            {
+                "command": "devcpc.focusEmulator",
+                "category": "DevCPC",
+                "title": "Focus Emulator"
+            },
+            {
+                "command": "devcpc.closeEmulator",
+                "category": "DevCPC",
+                "title": "Close Emulator"
             }
         ],
         "menus": {
