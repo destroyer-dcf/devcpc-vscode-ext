@@ -240,11 +240,24 @@ export class ConfigTreeCommands {
 
     /**
      * Habilitar/deshabilitar una variable (comentar/descomentar)
+     * Si lineNumber es -1, crea la variable en el archivo
      */
-    public static async toggleVariable(configPath: string, lineNumber: number, isCurrentlyEnabled?: boolean): Promise<void> {
+    public static async toggleVariable(configPath: string, lineNumber: number, isCurrentlyEnabled?: boolean, varName?: string, varDef?: any): Promise<void> {
+        console.log(`toggleVariable called: configPath=${configPath}, lineNumber=${lineNumber}, isEnabled=${isCurrentlyEnabled}, varName=${varName}`);
+        
         // Validar que existe el archivo
         if (!fs.existsSync(configPath)) {
             vscode.window.showErrorMessage('Archivo de configuración no encontrado');
+            return;
+        }
+
+        // Si la variable no existe en el archivo (lineNumber = -1), crearla
+        if (lineNumber < 0) {
+            if (!varName) {
+                vscode.window.showErrorMessage('No se puede crear la variable sin nombre');
+                return;
+            }
+            await ConfigTreeCommands.createVariableInConfig(configPath, varName, varDef);
             return;
         }
 
@@ -252,9 +265,12 @@ export class ConfigTreeCommands {
         const content = fs.readFileSync(configPath, 'utf8');
         const lines = content.split('\n');
         
+        console.log(`Total lines in file: ${lines.length}`);
+        console.log(`Line ${lineNumber} content: "${lines[lineNumber]}"`);
+        
         // Validar que el lineNumber está dentro del rango
-        if (lineNumber < 0 || lineNumber >= lines.length) {
-            vscode.window.showErrorMessage('Número de línea inválido. Intenta refrescar la configuración.');
+        if (lineNumber >= lines.length) {
+            vscode.window.showErrorMessage(`Número de línea inválido (${lineNumber}/${lines.length}). Intenta refrescar la configuración.`);
             return;
         }
 
@@ -281,6 +297,8 @@ export class ConfigTreeCommands {
             }
         }
 
+        console.log(`Replacing line ${lineNumber}: "${line}" -> "${newLine}"`);
+
         // Reemplazar la línea
         lines[lineNumber] = newLine;
 
@@ -289,5 +307,55 @@ export class ConfigTreeCommands {
 
         const action = isCurrentlyEnabled ? 'deshabilitada' : 'habilitada';
         vscode.window.showInformationMessage(`Variable ${action}`);
+    }
+
+    /**
+     * Crear una variable nueva en el archivo de configuración
+     */
+    private static async createVariableInConfig(configPath: string, varName: string, varDef?: any): Promise<void> {
+        // Pedir valor al usuario
+        const defaultValue = varDef?.options?.[0]?.value || '';
+        
+        let newValue: string | undefined;
+        
+        if (varDef && varDef.options && varDef.options.length > 0) {
+            // Si tiene opciones, mostrar QuickPick
+            const items: Array<vscode.QuickPickItem & { value: string }> = varDef.options.map((opt: any) => ({
+                label: String(opt.value),
+                description: opt.description,
+                value: String(opt.value)
+            }));
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `Selecciona valor para ${varName}`
+            });
+            
+            if (selected) {
+                newValue = selected.value;
+            }
+        } else {
+            // Si no tiene opciones, mostrar InputBox
+            newValue = await vscode.window.showInputBox({
+                prompt: varDef?.description || `Valor para ${varName}`,
+                value: String(defaultValue),
+                placeHolder: 'Introduce el valor para esta variable',
+                validateInput: (value) => ConfigTreeCommands.validateInput(varName, value, varDef)
+            });
+        }
+
+        if (newValue === undefined) {
+            return;
+        }
+
+        // Añadir la variable al final del archivo
+        const content = fs.readFileSync(configPath, 'utf8');
+        const needsQuotes = ConfigTreeCommands.needsQuotes(varName, newValue);
+        const formattedValue = needsQuotes && newValue !== '' ? `"${newValue}"` : newValue;
+        const newLine = `${varName}=${formattedValue}`;
+        
+        const newContent = content + (content.endsWith('\n') ? '' : '\n') + newLine + '\n';
+        fs.writeFileSync(configPath, newContent, 'utf8');
+
+        vscode.window.showInformationMessage(`${varName} creada con valor: ${newValue}`);
     }
 }

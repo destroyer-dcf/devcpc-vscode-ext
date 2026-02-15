@@ -235,6 +235,9 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
                 value = configValue.value;
                 isEnabled = configValue.enabled;
                 lineNumber = configValue.lineNumber;
+                console.log(`Creating tree item for ${varName}: line=${lineNumber}, enabled=${isEnabled}`);
+            } else {
+                console.log(`Creating tree item for ${varName}: NOT FOUND in config file`);
             }
 
             variables.push(new ConfigTreeItem(
@@ -263,6 +266,8 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
         const content = fs.readFileSync(configPath, 'utf8');
         const lines = content.split('\n');
 
+        console.log(`Parsing config file: ${configPath} (${lines.length} lines)`);
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
@@ -284,6 +289,8 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
                 // Limpiar comillas
                 value = value.replace(/^["']|["']$/g, '');
 
+                console.log(`Found var: ${varName} at line ${i}, enabled=${!isCommented}, value="${value}"`);
+
                 result.set(varName, {
                     value: value,
                     enabled: !isCommented,
@@ -292,6 +299,7 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
             }
         }
 
+        console.log(`Parsed ${result.size} variables from config file`);
         return result;
     }
 }

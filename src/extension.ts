@@ -40,12 +40,31 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand('devcpc.toggleConfigVariable', async (item) => {
-			if (item && item.configPath && item.lineNumber !== undefined && item.lineNumber >= 0) {
-				await ConfigTreeCommands.toggleVariable(item.configPath, item.lineNumber, item.isEnabled);
+			console.log('toggleConfigVariable command called with item:', item);
+			console.log('Item details:', {
+				configPath: item?.configPath,
+				lineNumber: item?.lineNumber,
+				isEnabled: item?.isEnabled,
+				varName: item?.varName
+			});
+			
+			if (item && item.configPath && item.lineNumber !== undefined) {
+				await ConfigTreeCommands.toggleVariable(
+					item.configPath, 
+					item.lineNumber, 
+					item.isEnabled,
+					item.varName,
+					item.varDefinition
+				);
 				// Refrescar el tree view después del toggle
 				configTreeProvider.refresh();
 			} else {
-				vscode.window.showErrorMessage('Datos de configuración inválidos. Intenta refrescar la vista.');
+				vscode.window.showErrorMessage(`Datos de configuración inválidos. Item: ${JSON.stringify({
+					hasItem: !!item,
+					hasPath: !!item?.configPath,
+					lineNumber: item?.lineNumber,
+					varName: item?.varName
+				})}`);
 			}
 		})
 	);
