@@ -1,0 +1,96 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DevCPC Config",
+  "scopeName": "source.devcpc-conf",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.devcpc-conf",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "^\\s*([A-Z_][A-Z0-9_]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "variable.other.devcpc-conf"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.devcpc-conf"
+            }
+          }
+        },
+        {
+          "match": "^\\s*(#)\\s*([A-Z_][A-Z0-9_]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "comment.line.number-sign.devcpc-conf"
+            },
+            "2": {
+              "name": "variable.other.disabled.devcpc-conf"
+            },
+            "3": {
+              "name": "keyword.operator.assignment.devcpc-conf"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.devcpc-conf",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.devcpc-conf",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.devcpc-conf",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.devcpc-conf",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.devcpc-conf",
+          "match": "\\b0[xX][0-9a-fA-F]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.devcpc-conf",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    }
+  }
+}

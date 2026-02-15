@@ -52,7 +52,8 @@ export class TaskTreeDataProvider implements vscode.TreeDataProvider<TreeTask> {
 						taskDef.label || taskDef.script || `Task ${i}`,
 						vscode.TreeItemCollapsibleState.None,
 						{ command: 'devcpcTasks.executeTask', title: "Execute", arguments: [taskDef] },
-						iconName
+						iconName,
+						taskDef
 					);
 				}
 			}
@@ -82,17 +83,21 @@ export class TaskTreeDataProvider implements vscode.TreeDataProvider<TreeTask> {
 
 class TreeTask extends vscode.TreeItem {
 	type: string;
+	taskDef?: any;
 
 	constructor(
 		type: string, 
 		label: string, 
 		collapsibleState: vscode.TreeItemCollapsibleState,
 		command?: vscode.Command,
-		icon?: string
+		icon?: string,
+		taskDef?: any
 	) {
 		super(label, collapsibleState);
 		this.type = type;
 		this.command = command;
+		this.taskDef = taskDef;
+		this.contextValue = 'task';
 		if (icon) {
 			this.iconPath = new vscode.ThemeIcon(icon);
 		}

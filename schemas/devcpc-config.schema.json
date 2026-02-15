@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DevCPC Configuration",
+  "description": "Configuración para proyectos DevCPC (Amstrad CPC)",
+  "type": "object",
+  "properties": {
+    "PROJECT_NAME": {
+      "type": "string",
+      "description": "Nombre del proyecto (usado para el DSK)"
+    },
+    "BUILD_LEVEL": {
+      "type": "integer",
+      "description": "Nivel de compilación (0-4)",
+      "minimum": 0,
+      "maximum": 4,
+      "enum": [0, 1, 2, 3, 4],
+      "enumDescriptions": [
+        "Todas las funcionalidades (MEMORY 23599)",
+        "Juegos de laberintos (MEMORY 24999)",
+        "Juegos con scroll (MEMORY 24799)",
+        "Juegos pseudo-3D (MEMORY 23999)",
+        "Sin scroll/layout +500 bytes (MEMORY 25299)"
+      ]
+    },
+    "ASM_PATH": {
+      "type": "string",
+      "description": "Ruta al código ensamblador 8BP"
+    },
+    "BASIC_PATH": {
+      "type": "string",
+      "description": "Ruta a archivos BASIC (se añaden automáticamente al DSK)"
+    },
+    "RAW_PATH": {
+      "type": "string",
+      "description": "Ruta a archivos RAW (se añaden al DSK sin encabezado AMSDOS)"
+    },
+    "C_PATH": {
+      "type": "string",
+      "description": "Ruta a código C (se compila con SDCC si existe)"
+    },
+    "C_SOURCE": {
+      "type": "string",
+      "description": "Archivo fuente C principal"
+    },
+    "C_CODE_LOC": {
+      "type": "integer",
+      "description": "Dirección de memoria para código C"
+    },
+    "BAS_SOURCE": {
+      "type": "string",
+      "description": "Archivo .bas a compilar"
+    },
+    "BAS_LOADADDR": {
+      "type": "string",
+      "description": "Dirección de carga del BASIC"
+    },
+    "OBJ_DIR": {
+      "type": "string",
+      "description": "Directorio para archivos intermedios (bin, lst, map, ihx)"
+    },
+    "DIST_DIR": {
+      "type": "string",
+      "description": "Directorio para la imagen DSK final"
+    },
+    "OUTPUT_PATH": {
+      "type": "string",
+      "description": "Ruta de salida para el binario compilado"
+    },
+    "DSK": {
+      "type": "string",
+      "description": "Nombre de la imagen DSK"
+    },
+    "CDT": {
+      "type": "string",
+      "description": "Nombre del archivo CDT"
+    },
+    "CDT_FILES": {
+      "type": "string",
+      "description": "Lista de archivos a incluir en la cinta (separados por espacios)"
+    },
+    "CPR": {
+      "type": "string",
+      "description": "Nombre del archivo CPR (cartucho)"
+    },
+    "CPR_EXECUTE": {
+      "type": "string",
+      "description": "Archivo a ejecutar al arrancar el cartucho"
+    },
+    "EMULATOR_TYPE": {
+      "type": "string",
+      "description": "Tipo de emulador a usar",
+      "enum": ["rvm", "integrated"],
+      "enumDescriptions": [
+        "Retro Virtual Machine (externo, más potente)",
+        "KC CPC WASM (integrado en VSCode)"
+      ],
+      "default": "integrated"
+    },
+    "RUN_MODE": {
+      "type": "string",
+      "description": "Modo de ejecución",
+      "enum": ["auto", "dsk", "cdt"],
+      "enumDescriptions": [
+        "Usa CDT si existe, sino DSK",
+        "Siempre usa DSK (disco)",
+        "Siempre usa CDT (cinta)"
+      ],
+      "default": "auto"
+    },
+    "RVM_PATH": {
+      "type": "string",
+      "description": "Ruta al ejecutable de Retro Virtual Machine"
+    },
+    "CPC_MODEL": {
+      "type": "integer",
+      "description": "Modelo de CPC",
+      "enum": [464, 664, 6128],
+      "default": 464
+    },
+    "RUN_FILE": {
+      "type": "string",
+      "description": "Archivo a ejecutar automáticamente"
+    },
+    "MODE": {
+      "type": "integer",
+      "description": "Modo CPC para la conversión",
+      "enum": [0, 1, 2],
+      "enumDescriptions": [
+        "160x200, 16 colores",
+        "320x200, 4 colores",
+        "640x200, 2 colores"
+      ]
+    },
+    "SPRITES_PATH": {
+      "type": "string",
+      "description": "Ruta donde están los PNG de sprites"
+    },
+    "SPRITES_OUT_FILE": {
+      "type": "string",
+      "description": "Archivo ASM de salida para sprites"
+    },
+    "SPRITES_TOLERANCE": {
+      "type": "integer",
+      "description": "Tolerancia RGB por canal (0=exacto, 8=recomendado, -1=automático)",
+      "default": 8
+    },
+    "SPRITES_TRANSPARENT_INK": {
+      "type": "integer",
+      "description": "INK para píxeles transparentes (0-26)",
+      "minimum": 0,
+      "maximum": 26
+    },
+    "LOADER_SCREEN": {
+      "type": "string",
+      "description": "Ruta donde están los PNG de pantallas de carga"
+    }
+  }
+}

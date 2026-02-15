@@ -106,20 +106,64 @@ export async function loadBinaryInEmulator(binPath: string): Promise<void> {
     }
 
     try {
-        // Leer el archivo binario
-        const binData = fs.readFileSync(binPath);
-        const binArray = Array.from(binData);
+        const ext = path.extname(binPath).toLowerCase();
+        
+        // Leer el archivo
+        const fileData = fs.readFileSync(binPath);
+        const dataArray = Array.from(fileData);
+
+        let command: any;
+        const fileName = path.basename(binPath);
+
+        switch (ext) {
+            case '.bin':
+                // Archivo binario, cargar en memoria directamente
+                command = {
+                    command: 'load_binary',
+                    data: dataArray,
+                    startAddress: 0x4000, // Dirección por defecto para CPC
+                    fileName: fileName
+                };
+                break;
+
+            case '.dsk':
+                // Imagen de disco
+                command = {
+                    command: 'insert_disk',
+                    data: dataArray,
+                    fileName: fileName
+                };
+                break;
+
+            case '.cdt':
+                // Cinta (cassette)
+                command = {
+                    command: 'insert_tape',
+                    data: dataArray,
+                    fileName: fileName
+                };
+                break;
+
+            case '.sna':
+                // Snapshot
+                command = {
+                    command: 'load_snapshot',
+                    data: dataArray,
+                    fileName: fileName
+                };
+                break;
+
+            default:
+                vscode.window.showErrorMessage(`Formato no soportado: ${ext}`);
+                return;
+        }
 
         // Enviar al emulador
-        state.panel.webview.postMessage({
-            command: 'load_binary',
-            data: binArray,
-            startAddress: 0x4000 // Dirección por defecto para CPC
-        });
+        state.panel.webview.postMessage(command);
 
-        vscode.window.showInformationMessage(`Cargado: ${path.basename(binPath)}`);
+        vscode.window.showInformationMessage(`Cargado: ${fileName}`);
     } catch (error) {
-        vscode.window.showErrorMessage(`Error cargando binario: ${error}`);
+        vscode.window.showErrorMessage(`Error cargando archivo: ${error}`);
     }
 }
 

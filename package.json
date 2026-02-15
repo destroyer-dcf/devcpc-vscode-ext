@@ -33,6 +33,28 @@
     ],
     "main": "./out/extension",
     "contributes": {
+        "languages": [
+            {
+                "id": "devcpc-conf",
+                "aliases": ["DevCPC Config", "devcpc"],
+                "extensions": [".conf"],
+                "filenames": ["devcpc.conf"],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "devcpc-conf",
+                "scopeName": "source.devcpc-conf",
+                "path": "./syntaxes/devcpc-conf.tmLanguage.json"
+            }
+        ],
+        "jsonValidation": [
+            {
+                "fileMatch": "devcpc.conf",
+                "url": "./schemas/devcpc-config.schema.json"
+            }
+        ],
         "views": {
             "explorer": [
                 {
@@ -90,6 +112,23 @@
                 "command": "devcpc.closeEmulator",
                 "category": "DevCPC",
                 "title": "Close Emulator"
+            },
+            {
+                "command": "devcpc.launchEmulator",
+                "category": "DevCPC",
+                "title": "Launch Emulator (Auto-detect)",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devcpc.runInEmulator",
+                "category": "DevCPC",
+                "title": "Run File in Emulator",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devcpcTasks.runTask",
+                "title": "Run Task",
+                "icon": "$(run)"
             }
         ],
         "menus": {
@@ -110,6 +149,18 @@
                     "command": "devcpc.toggleConfigVariable",
                     "when": "view == devcpcConfig && viewItem == configVariable",
                     "group": "inline"
+                },
+                {
+                    "command": "devcpcTasks.runTask",
+                    "when": "view == devcpcTasks && viewItem == task",
+                    "group": "inline"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "devcpc.runInEmulator",
+                    "when": "resourceExtname == .bin || resourceExtname == .dsk || resourceExtname == .cdt || resourceExtname == .sna",
+                    "group": "devcpc"
                 }
             ]
         }
