@@ -207,9 +207,21 @@ export class ConfigTreeCommands {
      * Actualizar el valor de una variable en el archivo
      */
     private static async updateConfigValue(configPath: string, lineNumber: number, varName: string, newValue: string, isEnabled?: boolean): Promise<void> {
+        // Validar que existe el archivo
+        if (!fs.existsSync(configPath)) {
+            vscode.window.showErrorMessage('Archivo de configuración no encontrado');
+            return;
+        }
+
         // Leer el archivo
         const content = fs.readFileSync(configPath, 'utf8');
         const lines = content.split('\n');
+
+        // Validar que el lineNumber está dentro del rango
+        if (lineNumber < 0 || lineNumber >= lines.length) {
+            vscode.window.showErrorMessage('Número de línea inválido. Intenta refrescar la configuración.');
+            return;
+        }
 
         // Determinar si necesita comillas
         const needsQuotes = ConfigTreeCommands.needsQuotes(varName, newValue);
@@ -230,10 +242,29 @@ export class ConfigTreeCommands {
      * Habilitar/deshabilitar una variable (comentar/descomentar)
      */
     public static async toggleVariable(configPath: string, lineNumber: number, isCurrentlyEnabled?: boolean): Promise<void> {
+        // Validar que existe el archivo
+        if (!fs.existsSync(configPath)) {
+            vscode.window.showErrorMessage('Archivo de configuración no encontrado');
+            return;
+        }
+
         // Leer el archivo
         const content = fs.readFileSync(configPath, 'utf8');
         const lines = content.split('\n');
+        
+        // Validar que el lineNumber está dentro del rango
+        if (lineNumber < 0 || lineNumber >= lines.length) {
+            vscode.window.showErrorMessage('Número de línea inválido. Intenta refrescar la configuración.');
+            return;
+        }
+
         const line = lines[lineNumber];
+        
+        // Validar que la línea existe y no es undefined
+        if (line === undefined) {
+            vscode.window.showErrorMessage('La línea no existe. Intenta refrescar la configuración.');
+            return;
+        }
 
         let newLine: string;
         

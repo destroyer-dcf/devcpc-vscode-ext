@@ -29,15 +29,23 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Comandos de configuración
 	context.subscriptions.push(
-		vscode.commands.registerCommand('devcpc.editConfigVariable', ConfigTreeCommands.editConfigVariable)
+		vscode.commands.registerCommand('devcpc.editConfigVariable', async (item) => {
+			await ConfigTreeCommands.editConfigVariable(item);
+			// Refrescar el tree view después de editar
+			configTreeProvider.refresh();
+		})
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand('devcpc.refreshConfig', () => configTreeProvider.refresh())
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand('devcpc.toggleConfigVariable', async (item) => {
-			if (item.configPath && item.lineNumber !== undefined) {
+			if (item && item.configPath && item.lineNumber !== undefined && item.lineNumber >= 0) {
 				await ConfigTreeCommands.toggleVariable(item.configPath, item.lineNumber, item.isEnabled);
+				// Refrescar el tree view después del toggle
+				configTreeProvider.refresh();
+			} else {
+				vscode.window.showErrorMessage('Datos de configuración inválidos. Intenta refrescar la vista.');
 			}
 		})
 	);
