@@ -64,13 +64,24 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
 
     getChildren(element?: ConfigTreeItem): Thenable<ConfigTreeItem[]> {
         if (!this.workspaceRoot) {
-            vscode.window.showInformationMessage('No hay workspace abierto');
-            return Promise.resolve([]);
+            return Promise.resolve([
+                new ConfigTreeItem(
+                    'No hay workspace abierto',
+                    vscode.TreeItemCollapsibleState.None,
+                    'section'
+                )
+            ]);
         }
 
         const configPath = this.findConfigPath(this.workspaceRoot);
         if (!configPath) {
-            return Promise.resolve([]);
+            return Promise.resolve([
+                new ConfigTreeItem(
+                    'No se encontró devcpc.conf',
+                    vscode.TreeItemCollapsibleState.None,
+                    'section'
+                )
+            ]);
         }
 
         if (!element) {
@@ -83,16 +94,40 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
     }
 
     private findConfigPath(rootPath: string): string | undefined {
-        // Buscar devcpc.conf en el workspace
+        // Buscar devcpc.conf en el workspace (raíz primero)
         const configPath = path.join(rootPath, 'devcpc.conf');
         if (fs.existsSync(configPath)) {
             return configPath;
         }
 
-        // Buscar en subdirectorios (test/my-game, etc.)
-        const testPath = path.join(rootPath, 'test', 'my-game', 'devcpc.conf');
-        if (fs.existsSync(testPath)) {
-            return testPath;
+        // Buscar recursivamente en subdirectorios (hasta 2 niveles)
+        try {
+            const dirs = fs.readdirSync(rootPath, { withFileTypes: true });
+            for (const dir of dirs) {
+                if (dir.isDirectory() && !dir.name.startsWith('.') && dir.name !== 'node_modules') {
+                    const subPath = path.join(rootPath, dir.name, 'devcpc.conf');
+                    if (fs.existsSync(subPath)) {
+                        return subPath;
+                    }
+                    
+                    // Buscar un nivel más profundo
+                    try {
+                        const subDirs = fs.readdirSync(path.join(rootPath, dir.name), { withFileTypes: true });
+                        for (const subDir of subDirs) {
+                            if (subDir.isDirectory() && !subDir.name.startsWith('.')) {
+                                const deepPath = path.join(rootPath, dir.name, subDir.name, 'devcpc.conf');
+                                if (fs.existsSync(deepPath)) {
+                                    return deepPath;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // Ignorar errores de permisos
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignorar errores de permisos
         }
 
         return undefined;

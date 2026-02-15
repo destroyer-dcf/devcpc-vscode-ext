@@ -27,6 +27,7 @@
     },
     "activationEvents": [
         "onView:devcpcTasks",
+        "onView:devcpcConfig",
         "workspaceContains:**/devcpc.conf",
         "workspaceContains:**/.vscode/taskcpc.json"
     ],
@@ -40,8 +41,7 @@
                 },
                 {
                     "id": "devcpcConfig",
-                    "name": "DevCPC Config",
-                    "when": "workspaceContains:**/devcpc.conf"
+                    "name": "DevCPC Config"
                 }
             ]
         },
