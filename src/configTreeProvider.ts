@@ -139,18 +139,24 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
         const sections: ConfigTreeItem[] = [];
         const sectionMap = new Map<string, boolean>();
 
-        let currentSection = 'General';
+        // Primera sección por defecto (antes de cualquier cabecera)
+        sectionMap.set('General', true);
         
-        for (const line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
             const trimmed = line.trim();
             
-            // Detectar cabeceras de sección
-            if (trimmed.startsWith('# ===')) {
-                const nextLine = lines[lines.indexOf(line) + 1];
-                if (nextLine && nextLine.trim().startsWith('#')) {
-                    currentSection = nextLine.trim().substring(1).trim();
-                    if (!sectionMap.has(currentSection)) {
-                        sectionMap.set(currentSection, true);
+            // Detectar cabeceras de sección: # ============
+            if (trimmed.startsWith('# ===') || trimmed.startsWith('# ====')) {
+                // Buscar la línea siguiente que contiene el nombre de la sección
+                if (i + 1 < lines.length) {
+                    const nextLine = lines[i + 1].trim();
+                    if (nextLine.startsWith('#') && !nextLine.startsWith('# ===')) {
+                        // Es el nombre de la sección
+                        const sectionName = nextLine.substring(1).trim();
+                        if (!sectionMap.has(sectionName)) {
+                            sectionMap.set(sectionName, true);
+                        }
                     }
                 }
             }
@@ -160,7 +166,7 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
         sectionMap.forEach((_, sectionName) => {
             sections.push(new ConfigTreeItem(
                 sectionName,
-                vscode.TreeItemCollapsibleState.Collapsed,
+                vscode.TreeItemCollapsibleState.Expanded,
                 'section'
             ));
         });
@@ -173,25 +179,32 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
         const lines = content.split('\n');
         const variables: ConfigTreeItem[] = [];
         
-        let inSection = false;
-        let currentSection = '';
+        let inSection = (sectionName === 'General'); // General es la sección inicial
+        let currentSection = 'General';
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
 
-            // Detectar inicio de sección
-            if (trimmed.startsWith('# ===')) {
-                const nextLine = lines[i + 1];
-                if (nextLine && nextLine.trim().startsWith('#')) {
-                    currentSection = nextLine.trim().substring(1).trim();
-                    inSection = (currentSection === sectionName);
+            // Detectar inicio de sección: # ==== seguido de nombre
+            if (trimmed.startsWith('# ===') || trimmed.startsWith('# ====')) {
+                if (i + 1 < lines.length) {
+                    const nextLine = lines[i + 1].trim();
+                    if (nextLine.startsWith('#') && !nextLine.startsWith('# ===')) {
+                        currentSection = nextLine.substring(1).trim();
+                        inSection = (currentSection === sectionName);
+                    }
                 }
                 continue;
             }
 
+            // Saltar líneas vacías y comentarios puros
+            if (!trimmed || (trimmed.startsWith('#') && !trimmed.includes('='))) {
+                continue;
+            }
+
             // Si estamos en la sección correcta, buscar variables
-            if (inSection && trimmed) {
+            if (inSection) {
                 const isCommented = trimmed.startsWith('#');
                 const cleanLine = isCommented ? trimmed.substring(1).trim() : trimmed;
 
@@ -215,11 +228,6 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
                         configPath
                     ));
                 }
-            }
-
-            // Salir de la sección si encontramos otra cabecera
-            if (inSection && trimmed.startsWith('# ===')) {
-                inSection = false;
             }
         }
 
