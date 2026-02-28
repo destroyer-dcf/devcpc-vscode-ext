@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { findConfigFileInWorkspace, parseConfigFile, resolveConfigPath } from './configUtils';
 
 interface EmulatorState {
     panel: vscode.WebviewPanel;
@@ -10,6 +11,34 @@ interface EmulatorState {
 }
 
 let state: EmulatorState | null = null;
+let lastAutoRunCommand: string | null = null;
+let lastAutoRunAt = 0;
+const AUTO_RUN_DEBOUNCE_MS = 2000;
+
+function resolveCpcTypeArgFromConfig(): { typeArg?: string; warning?: string } {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return {};
+    }
+    const rootPath = workspaceFolders[0].uri.fsPath;
+    const configPath = findConfigFileInWorkspace(rootPath);
+    if (!configPath) {
+        return {};
+    }
+    const config = parseConfigFile(configPath);
+    const modelRaw = (config.CPC_MODEL || '').trim();
+
+    if (!modelRaw || modelRaw === '6128') {
+        return {};
+    }
+    if (modelRaw === '464') {
+        return { typeArg: 'cpc464' };
+    }
+    if (modelRaw === '664') {
+        return { warning: 'CPC_MODEL=664 no está soportado por este WASM; se usará 6128.' };
+    }
+    return { warning: `CPC_MODEL=${modelRaw} no válido (usa 464, 664 o 6128). Se usará 6128.` };
+}
 
 /**
  * Inicializar el emulador integrado CPC
@@ -67,6 +96,9 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
         } else if (msg.command === 'emu_error') {
             console.error('[DevCPC Emulator] Error:', msg.error);
             vscode.window.showErrorMessage(`Emulador: ${msg.error}`);
+        } else if (msg.command === 'dsk_loaded_success') {
+            console.log('[DevCPC Emulator] DSK cargado exitosamente:', msg.filename);
+            vscode.window.showInformationMessage(`✓ DSK cargado exitosamente: ${msg.filename || 'disco'}`);
         } else if (msg.command === 'log') {
             console.log('[DevCPC Emulator] Log:', msg.text);
         }
@@ -83,9 +115,19 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
     // Leer template HTML
     const shellHtmlPath = path.join(context.extensionPath, 'media', 'shell.html');
     let html = fs.readFileSync(shellHtmlPath, 'utf8');
+    const modelSetup = resolveCpcTypeArgFromConfig();
+    if (modelSetup.warning) {
+        vscode.window.showWarningMessage(modelSetup.warning);
+    }
+    const emuArgsScript = modelSetup.typeArg
+        ? `<script type="text/javascript">(function(){try{const u=new URL(window.location.href);u.searchParams.set('type','${modelSetup.typeArg}');history.replaceState(null,'',u.toString());}catch(_){}})();</script>`
+        : '';
     
     // Reemplazar placeholders
-    html = html.replace('{{{emu}}}', emuUri.toString()).replace('{{{shell}}}', shellUri.toString());
+    html = html
+        .replace('{{{emu}}}', emuUri.toString())
+        .replace('{{{shell}}}', shellUri.toString())
+        .replace('{{{emuArgs}}}', emuArgsScript);
     
     panel.webview.html = html;
 
@@ -104,12 +146,141 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
                     state.ready = true;
                 }
             }, 2000);
+            
+            // Auto-cargar DSK/archivo si existe después de que el emulador esté listo
+            setTimeout(async () => {
+                try {
+                    await autoLoadBinaryOnEmulatorOpen(context);
+                } catch (error) {
+                    console.error('[DevCPC Emulator] Error en auto-load:', error);
+                }
+            }, 2500);
         }
     }, 1000);
 }
 
 /**
+ * Auto-cargar binario cuando se abre el emulador
+ */
+async function autoLoadBinaryOnEmulatorOpen(context: vscode.ExtensionContext): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        console.log('[DevCPC Emulator] No hay workspace folder');
+        return;
+    }
+    
+    const workspaceFolder = workspaceFolders[0];
+    const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
+    
+    if (!configPath) {
+        console.log('[DevCPC Emulator] No se encontró devcpc.conf en la raíz del workspace');
+        return;
+    }
+    
+    try {
+        const config = parseConfigFile(configPath);
+
+        let fileToLoad: string | undefined;
+        const preferCdt = (config.CPC_MODEL || '').trim() === '464';
+        const distDir = config.DIST_DIR ? resolveConfigPath(configPath, config.DIST_DIR) : undefined;
+
+        if (preferCdt) {
+            // Para CPC 464, priorizar cinta (CDT) sobre disco (DSK)
+            if (distDir && config.CDT) {
+                const cdtPath = path.join(distDir, config.CDT);
+                if (fs.existsSync(cdtPath)) {
+                    fileToLoad = cdtPath;
+                    console.log('[DevCPC Emulator] Auto-carga (CPC 464): CDT encontrado:', fileToLoad);
+                }
+            }
+            if (!fileToLoad && distDir && config.DSK) {
+                const dskPath = path.join(distDir, config.DSK);
+                if (fs.existsSync(dskPath)) {
+                    fileToLoad = dskPath;
+                    console.log('[DevCPC Emulator] Auto-carga (CPC 464): DSK fallback encontrado:', fileToLoad);
+                }
+            }
+        } else {
+            // Para 6128/664, mantener prioridad en DSK
+            if (distDir && config.DSK) {
+                const dskPath = path.join(distDir, config.DSK);
+                if (fs.existsSync(dskPath)) {
+                    fileToLoad = dskPath;
+                    console.log('[DevCPC Emulator] Auto-carga: DSK encontrado:', fileToLoad);
+                }
+            }
+            if (!fileToLoad && distDir && config.CDT) {
+                const cdtPath = path.join(distDir, config.CDT);
+                if (fs.existsSync(cdtPath)) {
+                    fileToLoad = cdtPath;
+                    console.log('[DevCPC Emulator] Auto-carga: CDT encontrado:', fileToLoad);
+                }
+            }
+        }
+
+        // 3. Buscar en OUTPUT_PATH
+        if (!fileToLoad && config.OUTPUT_PATH) {
+            const outputPath = resolveConfigPath(configPath, config.OUTPUT_PATH);
+
+            if (fs.existsSync(outputPath)) {
+                if (fs.statSync(outputPath).isDirectory()) {
+                    const files = fs.readdirSync(outputPath);
+                    const dskFile = files.find(f => f.endsWith('.dsk'));
+                    const cdtFile = files.find(f => f.endsWith('.cdt'));
+                    const binFile = files.find(f => f.endsWith('.bin'));
+                    
+                    const selectedFile = dskFile || cdtFile || binFile;
+                    if (selectedFile) {
+                        fileToLoad = path.join(outputPath, selectedFile);
+                        console.log('[DevCPC Emulator] Auto-carga: Archivo encontrado:', fileToLoad);
+                    }
+                }
+            }
+        }
+
+        if (fileToLoad) {
+            console.log('[DevCPC Emulator] Cargando automáticamente:', fileToLoad);
+            await loadBinaryInEmulator(fileToLoad);
+            const emuInput = buildAutoInputFromRunFile(config.RUN_FILE);
+            if (emuInput) {
+                await new Promise(resolve => setTimeout(resolve, 400));
+                sendInputToEmulator(emuInput);
+            }
+        } else {
+            console.log('[DevCPC Emulator] No se encontró archivo para auto-cargar');
+            const emuInput = buildAutoInputFromRunFile(config.RUN_FILE);
+            if (emuInput) {
+                await new Promise(resolve => setTimeout(resolve, 400));
+                sendInputToEmulator(emuInput);
+            }
+        }
+    } catch (error) {
+        console.error('[DevCPC Emulator] Error en autoLoadBinaryOnEmulatorOpen:', error);
+    }
+}
+
+function buildAutoInputFromRunFile(runFile?: string): string | undefined {
+    if (!runFile) {
+        return undefined;
+    }
+    const decoded = runFile
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t');
+    const trimmed = decoded.trim();
+    if (!trimmed) {
+        return undefined;
+    }
+
+    // Permite comandos completos (ej: |cpm) en RUN_FILE.
+    const isFullCommand = /^(\||run\b|call\b|load\b)/i.test(trimmed);
+    const cmd = isFullCommand ? decoded : `run"${trimmed}`;
+    return /[\r\n]$/.test(cmd) ? cmd : `${cmd}\n`;
+}
+
+/**
  * Cargar un archivo binario en el emulador
+```
  */
 export async function loadBinaryInEmulator(binPath: string): Promise<void> {
     console.log(`[DevCPC Emulator] loadBinaryInEmulator called with: ${binPath}`);
@@ -158,19 +329,61 @@ export async function loadBinaryInEmulator(binPath: string): Promise<void> {
         const fileName = path.basename(binPath);
         console.log(`[DevCPC Emulator] Base64 length: ${dataBase64.length}`);
 
-        // Enviar al emulador usando el comando 'load' estándar de KC IDE
-        // El emulador detecta automáticamente el tipo de archivo (DSK, CDT, SNA, etc.)
-        console.log(`[DevCPC Emulator] Enviando comando load al emulador para ${fileName}`);
+        // Detectar si es archivo DSK para usar comando específico
+        const isDsk = ext === '.dsk';
+        const cmd = isDsk ? 'load_dsk' : 'load';
+        
+        console.log(`[DevCPC Emulator] Enviando comando '${cmd}' al emulador para ${fileName}`);
+        
+        if (isDsk) {
+            console.log('[DevCPC Emulator] ════════════════════════════════════════════');
+            console.log('[DevCPC Emulator] IMPORTANTE: Carga de archivo DSK');
+            console.log('[DevCPC Emulator] ════════════════════════════════════════════');
+            console.log('[DevCPC Emulator] Los archivos DSK requieren funciones WASM especiales');
+            console.log('[DevCPC Emulator] Si no se carga correctamente:');
+            console.log('[DevCPC Emulator]   1. Abre Developer Tools (Help → Toggle Developer Tools)');
+            console.log('[DevCPC Emulator]   2. Ve a la pestaña Console');
+            console.log('[DevCPC Emulator]   3. Busca mensajes de kcide_load_dsk');
+            console.log('[DevCPC Emulator]   4. Ver DSK_SUPPORT.md para recompilar WASM');
+            console.log('[DevCPC Emulator] ════════════════════════════════════════════');
+        }
+        
         state.panel.webview.postMessage({
-            cmd: 'load',
+            cmd,
             data: dataBase64
         });
 
-        vscode.window.showInformationMessage(`Cargado: ${fileName}`);
-        console.log(`[DevCPC Emulator] Archivo enviado al emulador: ${fileName} (${ext})`);
+        if (!isDsk) {
+            vscode.window.showInformationMessage(`Cargado: ${fileName}`);
+        }
+        console.log(`[DevCPC Emulator] Archivo enviado al emulador: ${fileName} (${ext}) usando comando '${cmd}'`);
     } catch (error) {
         console.error('[DevCPC Emulator] Error:', error);
         vscode.window.showErrorMessage(`Error cargando archivo: ${error}`);
+    }
+}
+
+export function sendInputToEmulator(text: string): void {
+    if (!state) {
+        return;
+    }
+    state.panel.webview.postMessage({
+        cmd: 'input',
+        text
+    });
+}
+
+export function sendRunFileToEmulator(runFile?: string): void {
+    const emuInput = buildAutoInputFromRunFile(runFile);
+    if (emuInput) {
+        const now = Date.now();
+        if (lastAutoRunCommand === emuInput && (now - lastAutoRunAt) < AUTO_RUN_DEBOUNCE_MS) {
+            console.log('[DevCPC Emulator] RUN_FILE auto-comando omitido (debounce):', JSON.stringify(emuInput));
+            return;
+        }
+        lastAutoRunCommand = emuInput;
+        lastAutoRunAt = now;
+        sendInputToEmulator(emuInput);
     }
 }
 

@@ -8,6 +8,7 @@ import * as devCpcEmulator from './devCpcEmulator';
 import * as emulatorLauncher from './emulatorLauncher';
 import * as fs from 'fs';
 import * as path from 'path';
+import { findConfigFileInWorkspace, parseConfigFile, resolveConfigPath } from './configUtils';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -113,9 +114,14 @@ export function activate(context: vscode.ExtensionContext) {
 		if (!workspaceFolder) {
 			return;
 		}
+
+		const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
+		const config = configPath ? parseConfigFile(configPath) : {};
+		const emulatorType = String(config.EMULATOR_TYPE || 'integrated').trim().toLowerCase();
+		const skipDependenciesForIntegratedRun = emulatorType === 'integrated' && isRunTask(taskDef);
 		
 		// Si la tarea tiene dependsOn, ejecutar primero las dependencias
-		if (taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
+		if (!skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
 			const tasksCpcPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'taskcpc.json');
 			if (fs.existsSync(tasksCpcPath)) {
 				try {
@@ -134,6 +140,8 @@ export function activate(context: vscode.ExtensionContext) {
 					console.error('Error al ejecutar dependencias:', error);
 				}
 			}
+		} else if (skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
+			console.log('[DevCPC] Dependencias omitidas para tarea run en emulador integrado');
 		}
 		
 		// Ejecutar la tarea principal si tiene command
@@ -144,6 +152,22 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function executeTaskDef(context: vscode.ExtensionContext, taskDef: any, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+	const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
+	const config = configPath ? parseConfigFile(configPath) : {};
+	const emulatorType = String(config.EMULATOR_TYPE || 'integrated').trim().toLowerCase();
+	const runTask = isRunTask(taskDef);
+	console.log(`[DevCPC] executeTaskDef: label="${taskDef?.label || ''}" emulatorType="${emulatorType}" isRunTask=${runTask}`);
+
+	// Si es tarea de run y el emulador es integrado, no ejecutar "devcpc run" en terminal.
+	// Se resuelve el artefacto y se carga directamente en el emulador integrado.
+	if (emulatorType === 'integrated' && runTask) {
+		const runMode = getRunModeFromTask(taskDef);
+		const resolved = resolveOutputFileToLoad(workspaceFolder, configPath, config, runMode);
+		console.log(`[DevCPC] Interceptando tarea run para emulador integrado (mode=${runMode}). File=${resolved?.filePath || 'auto'}`);
+		await emulatorLauncher.launchEmulator(context, resolved?.filePath, { resetBeforeLoad: true });
+		return;
+	}
+
 	return new Promise((resolve, reject) => {
 		let execution;
 		if (taskDef.type === 'npm') {
@@ -153,6 +177,7 @@ async function executeTaskDef(context: vscode.ExtensionContext, taskDef: any, wo
 			if (taskDef.args && Array.isArray(taskDef.args)) {
 				commandLine += ' ' + taskDef.args.join(' ');
 			}
+			console.log(`[DevCPC] Ejecutando shell task: ${commandLine}`);
 			execution = new vscode.ShellExecution(commandLine);
 		}
 		
@@ -191,6 +216,98 @@ async function executeTaskDef(context: vscode.ExtensionContext, taskDef: any, wo
 	});
 }
 
+function isRunTask(taskDef: any): boolean {
+	const label = (taskDef?.label || '').toLowerCase();
+	const command = (taskDef?.command || '').toLowerCase();
+	const args = Array.isArray(taskDef?.args) ? taskDef.args.map((a: any) => String(a).toLowerCase()) : [];
+	const script = String(taskDef?.script || '').toLowerCase();
+
+	if (args.includes('run')) {
+		return true;
+	}
+	if (args.some(a => a === '--run' || a.includes('run:') || a.includes('run-'))) {
+		return true;
+	}
+	if (command.includes('devcpc') && command.includes('run')) {
+		return true;
+	}
+	if (script.includes('run')) {
+		return true;
+	}
+	// fallback por etiqueta cuando el task está orientado a run
+	return label.includes('run');
+}
+
+function getRunModeFromTask(taskDef: any): 'auto' | 'dsk' | 'cdt' {
+	const label = (taskDef?.label || '').toLowerCase();
+	const args = Array.isArray(taskDef?.args) ? taskDef.args.map((a: any) => String(a).toLowerCase()) : [];
+
+	if (args.includes('--dsk') || label.includes('run dsk')) {
+		return 'dsk';
+	}
+	if (args.includes('--cdt') || label.includes('run cdt')) {
+		return 'cdt';
+	}
+	return 'auto';
+}
+
+function resolveOutputFileToLoad(
+	workspaceFolder: vscode.WorkspaceFolder,
+	configPath: string | undefined,
+	config: any,
+	runMode: 'auto' | 'dsk' | 'cdt'
+): { filePath: string; fileName: string } | undefined {
+	if (!configPath) {
+		return undefined;
+	}
+
+	const preferCdtByModel = (config.CPC_MODEL || '').trim() === '464';
+	const distDir = config.DIST_DIR ? resolveConfigPath(configPath, config.DIST_DIR) : undefined;
+	const explicitMode = runMode !== 'auto' ? runMode : (preferCdtByModel ? 'cdt' : 'dsk');
+
+	const tryFile = (candidate?: string) => {
+		if (!candidate) return undefined;
+		if (fs.existsSync(candidate)) {
+			return { filePath: candidate, fileName: path.basename(candidate) };
+		}
+		return undefined;
+	};
+
+	if (distDir) {
+		const dskPath = config.DSK ? path.join(distDir, config.DSK) : undefined;
+		const cdtPath = config.CDT ? path.join(distDir, config.CDT) : undefined;
+
+		if (explicitMode === 'cdt') {
+			return tryFile(cdtPath) || tryFile(dskPath);
+		}
+		if (explicitMode === 'dsk') {
+			return tryFile(dskPath) || tryFile(cdtPath);
+		}
+	}
+
+	if (config.OUTPUT_PATH) {
+		const outputPath = resolveConfigPath(configPath, config.OUTPUT_PATH);
+		if (fs.existsSync(outputPath)) {
+			if (fs.statSync(outputPath).isDirectory()) {
+				const files = fs.readdirSync(outputPath);
+				const dskFile = files.find(f => f.endsWith('.dsk'));
+				const cdtFile = files.find(f => f.endsWith('.cdt'));
+				const binFile = files.find(f => f.endsWith('.bin'));
+				const selected = explicitMode === 'cdt'
+					? (cdtFile || dskFile || binFile)
+					: (dskFile || cdtFile || binFile);
+				if (selected) {
+					return { filePath: path.join(outputPath, selected), fileName: selected };
+				}
+			} else if (outputPath.match(/\.(bin|dsk|cdt)$/i)) {
+				return { filePath: outputPath, fileName: path.basename(outputPath) };
+			}
+		}
+	}
+
+	return undefined;
+}
+
 function getRevealKind(reveal?: string): vscode.TaskRevealKind {
 	switch (reveal) {
 		case 'always': return vscode.TaskRevealKind.Always;
@@ -218,74 +335,91 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 	// Leer configuración para obtener rutas
 	const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
 	if (!configPath) {
-		console.log('[DevCPC] No se encontró devcpc.conf');
+		console.log('[DevCPC] No se encontró devcpc.conf en la raíz del workspace');
 		return;
 	}
 
 	console.log('[DevCPC] Config encontrado en:', configPath);
 
 	try {
-		const content = fs.readFileSync(configPath, 'utf8');
-		const lines = content.split('\n');
-		const config: any = {};
-
-		// Parsear todas las variables de configuración
-		for (const line of lines) {
-			const trimmed = line.trim();
-			if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-				const [key, ...valueParts] = trimmed.split('=');
-				const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
-				config[key.trim()] = value;
-			}
-		}
+		const config = parseConfigFile(configPath);
+		const emulatorType = (config.EMULATOR_TYPE || 'integrated').toLowerCase();
 
 		console.log('[DevCPC] Configuración parseada:', JSON.stringify(config, null, 2));
 
-		// Buscar archivo generado en orden de prioridad: DSK, CDT, BIN
-		let fileToLoad: string | undefined;
-		let fileName: string | undefined;
-
-		// 1. Buscar DSK (lo más común en DevCPC)
-		if (config.DIST_DIR && config.DSK) {
-			const distDir = path.isAbsolute(config.DIST_DIR)
-				? config.DIST_DIR
-				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
-			const dskPath = path.join(distDir, config.DSK);
-			
-			console.log('[DevCPC] Buscando DSK en:', dskPath);
-			
-			if (fs.existsSync(dskPath)) {
-				fileToLoad = dskPath;
-				fileName = config.DSK;
-				console.log('[DevCPC] DSK encontrado:', dskPath);
-			} else {
-				console.log('[DevCPC] DSK no existe en esa ruta');
-			}
+		// Si no es emulador integrado, no lanzar el emulador de VS Code desde post-build.
+		// En ese caso debe seguir el flujo normal de tareas/comando (por ejemplo: devcpc run para RVM).
+		if (emulatorType !== 'integrated') {
+			console.log(`[DevCPC] EMULATOR_TYPE=${emulatorType}. Se omite auto-load del emulador integrado.`);
+			return;
 		}
 
-		// 2. Buscar CDT si no hay DSK
-		if (!fileToLoad && config.DIST_DIR && config.CDT) {
-			const distDir = path.isAbsolute(config.DIST_DIR)
-				? config.DIST_DIR
-				: path.join(workspaceFolder.uri.fsPath, config.DIST_DIR);
-			const cdtPath = path.join(distDir, config.CDT);
-			
-			console.log('[DevCPC] Buscando CDT en:', cdtPath);
-			
-			if (fs.existsSync(cdtPath)) {
-				fileToLoad = cdtPath;
-				fileName = config.CDT;
-				console.log('[DevCPC] CDT encontrado:', cdtPath);
-			} else {
-				console.log('[DevCPC] CDT no existe en esa ruta');
+		// Buscar archivo generado en orden de prioridad según modelo:
+		// CPC 464 => CDT, DSK, BIN
+		// otros     => DSK, CDT, BIN
+		let fileToLoad: string | undefined;
+		let fileName: string | undefined;
+		const preferCdt = (config.CPC_MODEL || '').trim() === '464';
+		const distDir = config.DIST_DIR ? resolveConfigPath(configPath, config.DIST_DIR) : undefined;
+
+		if (preferCdt) {
+			if (distDir && config.CDT) {
+				const cdtPath = path.join(distDir, config.CDT);
+				console.log('[DevCPC] (CPC 464) Buscando CDT en:', cdtPath);
+				if (fs.existsSync(cdtPath)) {
+					fileToLoad = cdtPath;
+					fileName = config.CDT;
+					console.log('[DevCPC] (CPC 464) CDT encontrado:', cdtPath);
+				} else {
+					console.log('[DevCPC] (CPC 464) CDT no existe en esa ruta');
+				}
+			}
+			if (!fileToLoad && distDir && config.DSK) {
+				const dskPath = path.join(distDir, config.DSK);
+				console.log('[DevCPC] (CPC 464) Buscando DSK fallback en:', dskPath);
+				if (fs.existsSync(dskPath)) {
+					fileToLoad = dskPath;
+					fileName = config.DSK;
+					console.log('[DevCPC] (CPC 464) DSK fallback encontrado:', dskPath);
+				} else {
+					console.log('[DevCPC] (CPC 464) DSK fallback no existe en esa ruta');
+				}
+			}
+		} else {
+			// 1. Buscar DSK (lo más común en DevCPC)
+			if (distDir && config.DSK) {
+				const dskPath = path.join(distDir, config.DSK);
+				
+				console.log('[DevCPC] Buscando DSK en:', dskPath);
+				
+				if (fs.existsSync(dskPath)) {
+					fileToLoad = dskPath;
+					fileName = config.DSK;
+					console.log('[DevCPC] DSK encontrado:', dskPath);
+				} else {
+					console.log('[DevCPC] DSK no existe en esa ruta');
+				}
+			}
+
+			// 2. Buscar CDT si no hay DSK
+			if (!fileToLoad && distDir && config.CDT) {
+				const cdtPath = path.join(distDir, config.CDT);
+				
+				console.log('[DevCPC] Buscando CDT en:', cdtPath);
+				
+				if (fs.existsSync(cdtPath)) {
+					fileToLoad = cdtPath;
+					fileName = config.CDT;
+					console.log('[DevCPC] CDT encontrado:', cdtPath);
+				} else {
+					console.log('[DevCPC] CDT no existe en esa ruta');
+				}
 			}
 		}
 
 		// 3. Buscar archivos .bin si no hay DSK/CDT
 		if (!fileToLoad && config.OUTPUT_PATH) {
-			const outputPath = path.isAbsolute(config.OUTPUT_PATH)
-				? config.OUTPUT_PATH
-				: path.join(workspaceFolder.uri.fsPath, config.OUTPUT_PATH);
+			const outputPath = resolveConfigPath(configPath, config.OUTPUT_PATH);
 
 			console.log('[DevCPC] Buscando en OUTPUT_PATH:', outputPath);
 
@@ -343,33 +477,6 @@ async function autoLoadBinaryAfterBuild(context: vscode.ExtensionContext, worksp
 	} catch (error) {
 		console.error('[DevCPC] Error en autoLoadBinaryAfterBuild:', error);
 	}
-}
-
-/**
- * Buscar devcpc.conf en el workspace
- */
-function findConfigFileInWorkspace(rootPath: string): string | undefined {
-	const configPath = path.join(rootPath, 'devcpc.conf');
-	if (fs.existsSync(configPath)) {
-		return configPath;
-	}
-
-	// Buscar en subdirectorios
-	try {
-		const dirs = fs.readdirSync(rootPath, { withFileTypes: true });
-		for (const dir of dirs) {
-			if (dir.isDirectory()) {
-				const subPath = path.join(rootPath, dir.name, 'devcpc.conf');
-				if (fs.existsSync(subPath)) {
-					return subPath;
-				}
-			}
-		}
-	} catch (error) {
-		// Ignorar errores
-	}
-
-	return undefined;
 }
 
 export function deactivate(): void {

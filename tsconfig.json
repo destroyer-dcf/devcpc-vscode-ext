@@ -21,6 +21,7 @@
         "node_modules",
         ".vscode-test",
         "src/test",
-        "vscode-kcide-main"
+        "BASURA/vscode-kcide-main",
+        "BASURA/chips-test"
     ]
 }

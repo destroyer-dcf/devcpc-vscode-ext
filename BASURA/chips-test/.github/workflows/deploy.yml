@@ -1,0 +1,42 @@
+name: Deploy Webpage
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: ashutoshvarma/setup-ninja@master
+      - uses: denoland/setup-deno@v2
+      - name: prepare
+        run: |
+          sudo apt update
+          sudo apt install webp
+          ./fibs emsdk install
+      - name: build
+        run: |
+          ./fibs webpage build
+      - name: upload-artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: webpage
+          path: .fibs/webpage
+          retention-days: 1
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+        with:
+          repository: floooh/tiny8bit
+          ssh-key: ${{ secrets.GHACTION_PUSH }}
+      - uses: actions/download-artifact@main
+        with:
+          name: webpage
+      - name: "commit and push"
+        run: |
+          git config user.email "none"
+          git config user.name "GH Action"
+          git add .
+          git commit -m "updated (${{ github.run_number }})"
+          git push

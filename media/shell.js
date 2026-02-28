@@ -31,6 +31,8 @@ function kcide_init() {
             case 'reset': kcide_reset(); break;
             case 'ready': kcide_ready(); break;
             case 'load': kcide_load(msg.data); break;
+            case 'load_dsk': kcide_load_dsk(msg.data); break;
+            case 'input': kcide_input(msg.text); break;
             case 'connect': kcide_dbgConnect(); break;
             case 'disconnect': kcide_dbgDisconnect(); break;
             case 'updateBreakpoints': kcide_dbgUpdateBreakpoints(msg.removeAddrs, msg.addAddrs); break;
@@ -81,12 +83,30 @@ function kcide_ready() {
     Module.vsCodeApi.postMessage({ command: 'emu_ready', isReady: result });
 }
 
+function kcide_input(text) {
+    if (typeof Module._webapi_input === 'function') {
+        Module._webapi_input(text || '');
+    } else {
+        console.warn('kcide_input: _webapi_input no disponible');
+    }
+}
+
+function kcide_get_heap_u8() {
+    if (Module.HEAPU8) {
+        return Module.HEAPU8;
+    }
+    if (typeof HEAPU8 !== 'undefined') {
+        return HEAPU8;
+    }
+    return null;
+}
+
 /**
  * @param {string} dataBase64
  * @param {boolean} start
  * @param {boolean} stopOnEntry
  */
-function kcide_load(dataBase64) {
+function kcide_load(dataBase64, retryCount = 0) {
     // NOTE: transfering ArrayBuffer objects is broken when running as web extension,
     // thus any binary data needs to be transferred as base64 encoded string
     const binStr = atob(dataBase64);
@@ -95,12 +115,130 @@ function kcide_load(dataBase64) {
         bin[i] = binStr.charCodeAt(i);
     }
     const size = bin.length;
+    const heapU8 = kcide_get_heap_u8();
+    if (!heapU8) {
+        if (retryCount < 20) {
+            setTimeout(() => kcide_load(dataBase64, retryCount + 1), 150);
+            return;
+        }
+        console.error('kcide_load: HEAPU8 no disponible, el WASM aún no está listo');
+        return;
+    }
     const ptr = Module._webapi_alloc(size);
-    Module.HEAPU8.set(bin, ptr);
+    heapU8.set(bin, ptr);
     if (!Module._webapi_load(ptr, size)) {
         console.warn('_webapi_load() returned false');
     }
     Module._webapi_free(ptr);
+}
+
+/**
+ * Load a DSK disk image into the CPC emulator
+ * @param {string} dataBase64 - Base64 encoded DSK file
+ */
+function kcide_load_dsk(dataBase64, retryCount = 0) {
+    console.log('═══════════════════════════════════════════════════');
+    console.log('kcide_load_dsk: Iniciando carga de archivo DSK...');
+    console.log('═══════════════════════════════════════════════════');
+    
+    try {
+        // Decodificar base64
+        const binStr = atob(dataBase64);
+        const bin = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+            bin[i] = binStr.charCodeAt(i);
+        }
+        const size = bin.length;
+        console.log(`✓ DSK decodificado: ${size} bytes (${(size/1024).toFixed(2)} KB)`);
+        
+        // VVerificar header DSK
+        const headerStr = String.fromCharCode.apply(null, bin.slice(0, 8));
+        console.log(`✓ Header DSK: "${headerStr}"`);
+        const isValidDsk = headerStr.includes('MV - CPC') || headerStr.includes('EXTENDED');
+        console.log(`✓ Formato DSK válido: ${isValidDsk ? 'SÍ' : 'NO'}`);
+        
+        if (!isValidDsk) {
+            console.error('✗✗✗ ERROR: El archivo no es un DSK válido');
+            return;
+        }
+        
+        // Verificar función disponible
+        console.log('\n→ Verificando función WASM:');
+        console.log(`  _webapi_insert_disc:  ${typeof Module._webapi_insert_disc === 'function' ? '✓ DISPONIBLE' : '✗ NO DISPONIBLE'}`);
+        
+        if (typeof Module._webapi_insert_disc !== 'function') {
+            console.error('\n╔═══════════════════════════════════════════════════════════╗');
+            console.error('║ ERROR: webapi_insert_disc() no está disponible           ║');
+            console.error('║                                                           ║');
+            console.error('║ El WASM del emulador no fue compilado correctamente.     ║');
+            console.error('║ Asegúrate de usar el WASM con el soporte DSK.            ║');
+            console.error('╚═══════════════════════════════════════════════════════════╝');
+            return;
+        }
+        
+        // Allocate memory in WASM
+        console.log('→ Allocando memoria WASM...');
+        const heapU8 = kcide_get_heap_u8();
+        if (!heapU8) {
+            if (retryCount < 20) {
+                setTimeout(() => kcide_load_dsk(dataBase64, retryCount + 1), 150);
+                return;
+            }
+            console.error('✗ HEAPU8 no disponible: el runtime WASM aún no está listo');
+            return;
+        }
+        const ptr = Module._webapi_alloc(size);
+        console.log(`✓ Memoria WASM alocada en ptr = 0x${ptr.toString(16)}`);
+        
+        // Copy DSK data to WASM memory
+        heapU8.set(bin, ptr);
+        console.log('✓ Datos copiados a memoria WASM');
+        
+        // ¡Insertar el disco usando la nueva función!
+        console.log('\n→ Llamando webapi_insert_disc()...');
+        let success = false;
+        
+        try {
+            const result = Module._webapi_insert_disc(ptr, size);
+            if (result) {
+                console.log('✓✓✓ ¡DSK CARGADO EXITOSAMENTE!');
+                success = true;
+            } else {
+                console.error('✗ webapi_insert_disc() retornó false');
+                console.error('  Posibles razones:');
+                console.error('  - Formato DSK corrupto o no soportado');
+                console.error('  - Error interno del emulador');
+            }
+        } catch (e) {
+            console.error('✗ Excepción al llamar webapi_insert_disc():', e);
+        }
+        
+        // Free allocated memory
+        Module._webapi_free(ptr);
+        console.log('\n✓ Memoria WASM liberada');
+        
+        if (success) {
+            console.log('\n═══════════════════════════════════════════════════');
+            console.log('✓✓✓ DISCO DSK INSERTADO CORRECTAMENTE');
+            console.log('═══════════════════════════════════════════════════\n');
+            
+            // Enviar mensaje de éxito
+            if (Module.vsCodeApi) {
+                Module.vsCodeApi.postMessage({ 
+                    command: 'dsk_loaded_success',
+                    filename: 'disk.dsk'
+                });
+            }
+        } else {
+            console.log('\n═══════════════════════════════════════════════════');
+            console.log('✗✗✗ ERROR: No se pudo cargar el DSK');
+            console.log('═══════════════════════════════════════════════════\n');
+        }
+        
+    } catch (error) {
+        console.error('\n✗✗✗ EXCEPCIÓN en kcide_load_dsk:', error);
+        console.error('Stack trace:', error.stack);
+    }
 }
 
 /**

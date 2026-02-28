@@ -4,73 +4,16 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as devCpcEmulator from './devCpcEmulator';
+import { ConfigValues, findConfigFileInWorkspace, parseConfigFile } from './configUtils';
 
-interface ConfigValues {
-    [key: string]: string | undefined;
-}
-
-/**
- * Cargar y parsear el archivo devcpc.conf
- */
-function parseConfigFile(configPath: string): ConfigValues {
-    const values: ConfigValues = {};
-    
-    if (!fs.existsSync(configPath)) {
-        return values;
-    }
-
-    const content = fs.readFileSync(configPath, 'utf8');
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-        const trimmed = line.trim();
-        
-        // Ignorar líneas vacías
-        if (!trimmed) continue;
-        
-        // Variables habilitadas
-        if (trimmed.includes('=') && !trimmed.startsWith('#')) {
-            const [key, ...valueParts] = trimmed.split('=');
-            const value = valueParts.join('=').trim();
-            values[key.trim()] = value;
-        }
-    }
-
-    return values;
-}
-
-/**
- * Buscar el archivo devcpc.conf en el workspace
- */
-function findConfigPath(rootPath: string): string | undefined {
-    // Buscar devcpc.conf en el workspace (raíz primero)
-    const configPath = path.join(rootPath, 'devcpc.conf');
-    if (fs.existsSync(configPath)) {
-        return configPath;
-    }
-
-    // Buscar recursivamente en subdirectorios (hasta 2 niveles)
-    try {
-        const dirs = fs.readdirSync(rootPath, { withFileTypes: true });
-        for (const dir of dirs) {
-            if (dir.isDirectory()) {
-                const subPath = path.join(rootPath, dir.name, 'devcpc.conf');
-                if (fs.existsSync(subPath)) {
-                    return subPath;
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error buscando devcpc.conf:', error);
-    }
-
-    return undefined;
+interface LaunchOptions {
+    resetBeforeLoad?: boolean;
 }
 
 /**
  * Lanzar el emulador según la configuración EMULATOR_TYPE
  */
-export async function launchEmulator(context: vscode.ExtensionContext, binaryPath?: string): Promise<void> {
+export async function launchEmulator(context: vscode.ExtensionContext, binaryPath?: string, options?: LaunchOptions): Promise<void> {
     console.log('[EmulatorLauncher] launchEmulator called with binaryPath:', binaryPath);
     
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -79,17 +22,29 @@ export async function launchEmulator(context: vscode.ExtensionContext, binaryPat
         return;
     }
 
-    const configPath = findConfigPath(workspaceFolder.uri.fsPath);
-    if (!configPath) {
-        console.log('[EmulatorLauncher] No se encontró devcpc.conf, usando emulador integrado por defecto');
-        await launchIntegratedEmulator(context, binaryPath);
-        return;
+    const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
+    let config: ConfigValues = {};
+    let emulatorType = 'integrated'; // Por defecto
+    
+    if (configPath) {
+        console.log('[EmulatorLauncher] Config path:', configPath);
+        config = parseConfigFile(configPath);
+        emulatorType = config['EMULATOR_TYPE']?.toLowerCase() || 'integrated';
+    } else {
+        console.log('[EmulatorLauncher] No se encontró devcpc.conf en la raíz del workspace');
     }
 
-    console.log('[EmulatorLauncher] Config path:', configPath);
-
-    const config = parseConfigFile(configPath);
-    const emulatorType = config['EMULATOR_TYPE']?.toLowerCase() || 'integrated';
+    // Detectar si el archivo es DSK o CDT
+    if (binaryPath) {
+        const ext = path.extname(binaryPath).toLowerCase();
+        console.log('[EmulatorLauncher] File extension:', ext);
+        
+        if (ext === '.dsk') {
+            console.log('[EmulatorLauncher] DSK file detected - will be loaded using kcide_load_dsk');
+        } else if (ext === '.cdt') {
+            console.log('[EmulatorLauncher] CDT file detected');
+        }
+    }
 
     console.log('[EmulatorLauncher] EMULATOR_TYPE:', emulatorType);
 
@@ -98,7 +53,7 @@ export async function launchEmulator(context: vscode.ExtensionContext, binaryPat
         await launchRvmEmulator(config, binaryPath);
     } else if (emulatorType === 'integrated') {
         console.log('[EmulatorLauncher] Lanzando emulador integrado...');
-        await launchIntegratedEmulator(context, binaryPath);
+        await launchIntegratedEmulator(context, config, binaryPath, options);
     } else {
         vscode.window.showErrorMessage(`Tipo de emulador desconocido: ${emulatorType}`);
     }
@@ -142,7 +97,7 @@ async function launchRvmEmulator(config: ConfigValues, binaryPath?: string): Pro
 /**
  * Lanzar el emulador integrado (KC CPC)
  */
-async function launchIntegratedEmulator(context: vscode.ExtensionContext, binaryPath?: string): Promise<void> {
+async function launchIntegratedEmulator(context: vscode.ExtensionContext, config: ConfigValues, binaryPath?: string, options?: LaunchOptions): Promise<void> {
     console.log('[EmulatorLauncher] launchIntegratedEmulator called');
     console.log('[EmulatorLauncher] binaryPath:', binaryPath);
     console.log('[EmulatorLauncher] isEmulatorActive:', devCpcEmulator.isEmulatorActive());
@@ -163,8 +118,20 @@ async function launchIntegratedEmulator(context: vscode.ExtensionContext, binary
     
     // Cargar el binario si se proporcionó
     if (binaryPath) {
+        if (options?.resetBeforeLoad && devCpcEmulator.isEmulatorActive()) {
+            console.log('[EmulatorLauncher] Reset antes de run (integrated)');
+            devCpcEmulator.resetEmulator();
+            await new Promise(resolve => setTimeout(resolve, 250));
+        }
         console.log('[EmulatorLauncher] Cargando archivo:', binaryPath);
         await devCpcEmulator.loadBinaryInEmulator(binaryPath);
+        const runFile = config['RUN_FILE'];
+        if (runFile) {
+            // Tras reset+load el firmware tarda más en aceptar teclado; si no, se comen los primeros chars.
+            const runFileDelayMs = options?.resetBeforeLoad ? 1200 : 400;
+            await new Promise(resolve => setTimeout(resolve, runFileDelayMs));
+            devCpcEmulator.sendRunFileToEmulator(runFile);
+        }
     } else {
         console.log('[EmulatorLauncher] No hay archivo para cargar');
     }
