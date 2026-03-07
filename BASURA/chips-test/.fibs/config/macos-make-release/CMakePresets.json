@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "macos-make-release",
+      "displayName": "macos-make-release",
+      "binaryDir": "/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/macos-make-release",
+      "generator": "Unix Makefiles",
+      "environment": {},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "macos-make-release"
+    }
+  ]
+}

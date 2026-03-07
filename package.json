@@ -33,6 +33,15 @@
         "workspaceContains:**/.vscode/taskcpc.json"
     ],
     "main": "./out/extension",
+    "files": [
+        "out/**",
+        "assets/**",
+        "devcpc.png",
+        "README.md",
+        "CHANGELOG.md",
+        "LICENSE",
+        "package.json"
+    ],
     "contributes": {
         "languages": [
             {

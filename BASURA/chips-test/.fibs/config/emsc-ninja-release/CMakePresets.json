@@ -1,0 +1,27 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "emsc-ninja-release",
+      "displayName": "emsc-ninja-release",
+      "binaryDir": "/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/emsc-ninja-release",
+      "generator": "Ninja",
+      "toolchainFile": "/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/sdks/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "environment": {},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "emsc-ninja-release"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# ninja log v6
+2	601	1771352130941898244	CMakeFiles/ALL_JOBS	91bce9c4a973891c
+2	601	1771352130941898244	/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/build/emsc-ninja-release/CMakeFiles/ALL_JOBS	91bce9c4a973891c
+603	2549	1771352131543076588	CMakeFiles/common.dir/examples/common/prof.c.o	8dab572a06fb6ea4
+1	2551	1771352130941261328	CMakeFiles/keybuf.dir/examples/common/keybuf.c.o	21f44a462aef569e
+603	2551	1771352131542878380	CMakeFiles/common.dir/examples/common/gfx.c.o	85a3d602b6e7906a
+602	2555	1771352131542480130	CMakeFiles/common.dir/examples/common/clock.c.o	79cc3448bac22229
+1	2559	1771352130941596786	CMakeFiles/webapi.dir/examples/common/webapi.c.o	d818d2e94884587e
+602	2578	1771352131542706880	CMakeFiles/common.dir/examples/common/fs.c.o	b70bd6db1c2b76cc
+2	2835	1771352130942147328	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/cimgui.cpp.o	8fb054c4ee620169
+2	2946	1771352130942414828	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/cimgui_internal.cpp.o	8f1f8fe844b34560
+3	3009	1771352130943369536	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/imgui_tables.cpp.o	a4e91a93686aa979
+2549	3254	1771352133489780427	CMakeFiles/ui.dir/examples/common/ui.cc.o	894ee6b43aaaf392
+2	3324	1771352130942684244	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/imgui_demo.cpp.o	89c8873feb54d846
+2551	3385	1771352133490821177	libkeybuf.a	512c2a05145fa01
+2553	3388	1771352133493176135	CMakeFiles/cpc-ui.dir/examples/emus/cpc.c.o	e8b2e25cd60485f3
+2559	3392	1771352133498942384	libwebapi.a	928b4da9c0e3a60b
+2555	3512	1771352133495557468	CMakeFiles/cpc-ui.dir/examples/emus/cpc-ui-impl.cc.o	82c28c69d963151e
+602	3559	1771352131542183422	CMakeFiles/common.dir/examples/common/sokol.c.o	c56cc20f3b86e520
+4	3570	1771352130943897119	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/imgui_widgets.cpp.o	7783ff4130addae1
+3	3662	1771352130943019786	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/imgui_draw.cpp.o	4824bc633754ee8a
+3559	3704	1771352134499232153	libcommon.a	52375335fac50faf
+4	4762	1771352130944524994	CMakeFiles/imgui-docking.dir/.fibs/imports/dcimgui/src-docking/imgui.cpp.o	bf95c6dda8c7b42e
+4762	4931	1771352135702653383	libimgui-docking.a	aeb1c7afedd9308f
+4931	5075	1771352135871148352	libui.a	f7c2b8f0434da60b
+5075	29693	1771352136015082991	/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/dist/emsc-ninja-release/cpc-ui.html	47d405b60f91d242

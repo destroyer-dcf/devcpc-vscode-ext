@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/emsc-ninja-release/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
