@@ -15,6 +15,13 @@ let lastAutoRunCommand: string | null = null;
 let lastAutoRunAt = 0;
 const AUTO_RUN_DEBOUNCE_MS = 2000;
 
+// Flag para evitar doble envío del run command cuando el launcher ya lo maneja
+let externalLoadPending = false;
+
+export function setExternalLoadPending(value: boolean): void {
+    externalLoadPending = value;
+}
+
 function resolveCpcTypeArgFromConfig(): { typeArg?: string; warning?: string } {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -163,6 +170,11 @@ async function setupEmulator(context: vscode.ExtensionContext): Promise<void> {
  * Auto-cargar binario cuando se abre el emulador
  */
 async function autoLoadBinaryOnEmulatorOpen(context: vscode.ExtensionContext): Promise<void> {
+    if (externalLoadPending) {
+        console.log('[DevCPC Emulator] Auto-carga omitida: hay una carga externa en curso');
+        return;
+    }
+
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
         console.log('[DevCPC Emulator] No hay workspace folder');
@@ -241,17 +253,27 @@ async function autoLoadBinaryOnEmulatorOpen(context: vscode.ExtensionContext): P
         if (fileToLoad) {
             console.log('[DevCPC Emulator] Cargando automáticamente:', fileToLoad);
             await loadBinaryInEmulator(fileToLoad);
-            const emuInput = buildAutoInputFromRunFile(config.RUN_FILE);
-            if (emuInput) {
-                await new Promise(resolve => setTimeout(resolve, 400));
-                sendInputToEmulator(emuInput);
+            // Solo enviar run command si el launcher externo NO lo va a hacer
+            if (!externalLoadPending) {
+                const emuInput = buildAutoInputFromRunFile(config.RUN_FILE, config.CPC_MODEL, fileToLoad);
+                if (emuInput) {
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                    sendInputToEmulator(emuInput);
+                }
+            } else {
+                console.log('[DevCPC Emulator] autoLoad: run command omitido (externalLoadPending=true)');
             }
         } else {
             console.log('[DevCPC Emulator] No se encontró archivo para auto-cargar');
-            const emuInput = buildAutoInputFromRunFile(config.RUN_FILE);
-            if (emuInput) {
-                await new Promise(resolve => setTimeout(resolve, 400));
-                sendInputToEmulator(emuInput);
+            // Solo enviar run command si el launcher externo NO lo va a hacer
+            if (!externalLoadPending) {
+                const emuInput = buildAutoInputFromRunFile(config.RUN_FILE, config.CPC_MODEL);
+                if (emuInput) {
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                    sendInputToEmulator(emuInput);
+                }
+            } else {
+                console.log('[DevCPC Emulator] autoLoad: run command omitido sin archivo (externalLoadPending=true)');
             }
         }
     } catch (error) {
@@ -259,8 +281,21 @@ async function autoLoadBinaryOnEmulatorOpen(context: vscode.ExtensionContext): P
     }
 }
 
-function buildAutoInputFromRunFile(runFile?: string): string | undefined {
+function buildAutoInputFromRunFile(runFile?: string, cpcModel?: string, loadedFilePath?: string): string | undefined {
+    const loadedExt = loadedFilePath ? path.extname(loadedFilePath).toLowerCase() : '';
+    const isTapeImage = loadedExt === '.cdt';
+    const model = (cpcModel || '').trim();
+
+    // Para CPC 464, la cinta se carga siempre con run"" sin especificar fichero
+    if (model === '464' && (isTapeImage || !loadedExt)) {
+        return 'run""\r';
+    }
+
     if (!runFile) {
+        if (isTapeImage) {
+            // En 6128/664 hay que activar la cinta antes del RUN.
+            return '|tape\rrun""\r';
+        }
         return undefined;
     }
     const decoded = runFile
@@ -274,8 +309,15 @@ function buildAutoInputFromRunFile(runFile?: string): string | undefined {
 
     // Permite comandos completos (ej: |cpm) en RUN_FILE.
     const isFullCommand = /^(\||run\b|call\b|load\b)/i.test(trimmed);
-    const cmd = isFullCommand ? decoded : `run"${trimmed}`;
-    return /[\r\n]$/.test(cmd) ? cmd : `${cmd}\n`;
+    const startsWithTape = /^\|tape\b/i.test(trimmed);
+    let cmd = isFullCommand ? decoded : `run"${trimmed}`;
+
+    if (isTapeImage && !startsWithTape && model !== '464') {
+        cmd = `|tape\r${cmd}`;
+    }
+
+    const normalized = cmd.replace(/\r?\n/g, '\r');
+    return /[\r\n]$/.test(normalized) ? normalized : `${normalized}\r`;
 }
 
 /**
@@ -367,14 +409,19 @@ export function sendInputToEmulator(text: string): void {
     if (!state) {
         return;
     }
+
+    const normalizedText = text.replace(/\r?\n/g, '\r');
     state.panel.webview.postMessage({
         cmd: 'input',
-        text
+        text: normalizedText
     });
 }
 
-export function sendRunFileToEmulator(runFile?: string): void {
-    const emuInput = buildAutoInputFromRunFile(runFile);
+export function sendRunFileToEmulator(runFile?: string, cpcModel?: string, loadedFilePath?: string): void {
+    console.log('[DevCPC Emulator] sendRunFileToEmulator called with runFile:', runFile, 'cpcModel:', cpcModel, 'loadedFilePath:', loadedFilePath);
+    const emuInput = buildAutoInputFromRunFile(runFile, cpcModel, loadedFilePath);
+    console.log('[DevCPC Emulator] buildAutoInputFromRunFile result:', JSON.stringify(emuInput));
+    
     if (emuInput) {
         const now = Date.now();
         if (lastAutoRunCommand === emuInput && (now - lastAutoRunAt) < AUTO_RUN_DEBOUNCE_MS) {
@@ -383,7 +430,10 @@ export function sendRunFileToEmulator(runFile?: string): void {
         }
         lastAutoRunCommand = emuInput;
         lastAutoRunAt = now;
+        console.log('[DevCPC Emulator] Sending RUN_FILE command to emulator:', JSON.stringify(emuInput));
         sendInputToEmulator(emuInput);
+    } else {
+        console.log('[DevCPC Emulator] No RUN_FILE command to send (runFile was empty or invalid)');
     }
 }
 

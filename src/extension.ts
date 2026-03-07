@@ -14,19 +14,30 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const taskTreeDataProvider = new TaskTreeDataProvider(context);
 
-	vscode.window.registerTreeDataProvider('devcpcTasks', taskTreeDataProvider);
-	vscode.commands.registerCommand('devcpcTasks.refresh', () => taskTreeDataProvider.refresh());
+	// Registrar proveedor de vista de tareas
+	context.subscriptions.push(
+		vscode.window.registerTreeDataProvider('devcpcTasks', taskTreeDataProvider)
+	);
+	
+	// Comando para refrescar el árbol de tareas
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpcTasks.refresh', () => taskTreeDataProvider.refresh())
+	);
 
 	// Comando para ejecutar tarea desde botón inline
-	vscode.commands.registerCommand('devcpcTasks.runTask', async (item: any) => {
-		if (item.taskDef) {
-			await vscode.commands.executeCommand('devcpcTasks.executeTask', item.taskDef);
-		}
-	});
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpcTasks.runTask', async (item: any) => {
+			if (item.taskDef) {
+				await vscode.commands.executeCommand('devcpcTasks.executeTask', item.taskDef);
+			}
+		})
+	);
 
 	// Registrar ConfigTreeProvider para devcpc.conf
 	const configTreeProvider = new ConfigTreeProvider();
-	vscode.window.registerTreeDataProvider('devcpcConfig', configTreeProvider);
+	context.subscriptions.push(
+		vscode.window.registerTreeDataProvider('devcpcConfig', configTreeProvider)
+	);
 
 	// Comandos de configuración
 	context.subscriptions.push(
@@ -107,48 +118,51 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	vscode.commands.registerCommand('devcpcTasks.executeTask', async function(taskDef: any) {
-		console.log('Ejecutando tarea:', taskDef.label);
-		
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-		if (!workspaceFolder) {
-			return;
-		}
-
-		const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
-		const config = configPath ? parseConfigFile(configPath) : {};
-		const emulatorType = String(config.EMULATOR_TYPE || 'integrated').trim().toLowerCase();
-		const skipDependenciesForIntegratedRun = emulatorType === 'integrated' && isRunTask(taskDef);
-		
-		// Si la tarea tiene dependsOn, ejecutar primero las dependencias
-		if (!skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
-			const tasksCpcPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'taskcpc.json');
-			if (fs.existsSync(tasksCpcPath)) {
-				try {
-					const fileContent = fs.readFileSync(tasksCpcPath, 'utf8');
-					const tasksConfig = JSON.parse(fileContent);
-					
-					// Ejecutar cada dependencia en secuencia
-					for (const depLabel of taskDef.dependsOn) {
-						const depTaskDef = tasksConfig.tasks.find((t: any) => t.label === depLabel);
-						if (depTaskDef) {
-							console.log('Ejecutando dependencia:', depLabel);
-							await executeTaskDef(context, depTaskDef, workspaceFolder);
-						}
-					}
-				} catch (error) {
-					console.error('Error al ejecutar dependencias:', error);
-				}
+	// Comando para ejecutar tareas DevCPC
+	context.subscriptions.push(
+		vscode.commands.registerCommand('devcpcTasks.executeTask', async function(taskDef: any) {
+			console.log('Ejecutando tarea:', taskDef.label);
+			
+			const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+			if (!workspaceFolder) {
+				return;
 			}
-		} else if (skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
-			console.log('[DevCPC] Dependencias omitidas para tarea run en emulador integrado');
-		}
-		
-		// Ejecutar la tarea principal si tiene command
-		if (taskDef.command) {
-			await executeTaskDef(context, taskDef, workspaceFolder);
-		}
-	});
+
+			const configPath = findConfigFileInWorkspace(workspaceFolder.uri.fsPath);
+			const config = configPath ? parseConfigFile(configPath) : {};
+			const emulatorType = String(config.EMULATOR_TYPE || 'integrated').trim().toLowerCase();
+			const skipDependenciesForIntegratedRun = emulatorType === 'integrated' && isRunTask(taskDef);
+			
+			// Si la tarea tiene dependsOn, ejecutar primero las dependencias
+			if (!skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
+				const tasksCpcPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'taskcpc.json');
+				if (fs.existsSync(tasksCpcPath)) {
+					try {
+						const fileContent = fs.readFileSync(tasksCpcPath, 'utf8');
+						const tasksConfig = JSON.parse(fileContent);
+						
+						// Ejecutar cada dependencia en secuencia
+						for (const depLabel of taskDef.dependsOn) {
+							const depTaskDef = tasksConfig.tasks.find((t: any) => t.label === depLabel);
+							if (depTaskDef) {
+								console.log('Ejecutando dependencia:', depLabel);
+								await executeTaskDef(context, depTaskDef, workspaceFolder);
+							}
+						}
+					} catch (error) {
+						console.error('Error al ejecutar dependencias:', error);
+					}
+				}
+			} else if (skipDependenciesForIntegratedRun && taskDef.dependsOn && Array.isArray(taskDef.dependsOn)) {
+				console.log('[DevCPC] Dependencias omitidas para tarea run en emulador integrado');
+			}
+			
+			// Ejecutar la tarea principal si tiene command
+			if (taskDef.command) {
+				await executeTaskDef(context, taskDef, workspaceFolder);
+			}
+		})
+	);
 }
 
 async function executeTaskDef(context: vscode.ExtensionContext, taskDef: any, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {

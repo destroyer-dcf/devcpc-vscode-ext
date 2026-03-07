@@ -11,6 +11,8 @@ export class TaskTreeDataProvider implements vscode.TreeDataProvider<TreeTask> {
 
 	constructor(private context: vscode.ExtensionContext) {
 		this.autoRefresh = vscode.workspace.getConfiguration('devcpcTasks').get('autorefresh');
+		// Refrescar cuando cambia la carpeta del workspace
+		vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh());
 	}
 
 	refresh(): void {

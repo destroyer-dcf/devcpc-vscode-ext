@@ -69,17 +69,21 @@ export class ConfigTreeProvider implements vscode.TreeDataProvider<ConfigTreeIte
     private _onDidChangeTreeData: vscode.EventEmitter<ConfigTreeItem | undefined | null | void> = new vscode.EventEmitter<ConfigTreeItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<ConfigTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-    private workspaceRoot: string | undefined;
     private varsSchema: VarsSchema | null = null;
 
+    private get workspaceRoot(): string | undefined {
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    }
+
     constructor() {
-        this.workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        
         // Observar cambios en devcpc.conf
         const watcher = vscode.workspace.createFileSystemWatcher('**/devcpc.conf');
         watcher.onDidChange(() => this.refresh());
         watcher.onDidCreate(() => this.refresh());
         watcher.onDidDelete(() => this.refresh());
+
+        // Refrescar cuando cambia la carpeta del workspace
+        vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh());
         
         // Cargar el esquema de vars.yml
         this.loadVarsSchema();

@@ -100,40 +100,64 @@ async function launchRvmEmulator(config: ConfigValues, binaryPath?: string): Pro
 async function launchIntegratedEmulator(context: vscode.ExtensionContext, config: ConfigValues, binaryPath?: string, options?: LaunchOptions): Promise<void> {
     console.log('[EmulatorLauncher] launchIntegratedEmulator called');
     console.log('[EmulatorLauncher] binaryPath:', binaryPath);
-    console.log('[EmulatorLauncher] isEmulatorActive:', devCpcEmulator.isEmulatorActive());
+    const wasActiveBeforeLaunch = devCpcEmulator.isEmulatorActive();
+    console.log('[EmulatorLauncher] isEmulatorActive:', wasActiveBeforeLaunch);
     
-    // Inicializar el emulador si no está activo
-    if (!devCpcEmulator.isEmulatorActive()) {
-        console.log('[EmulatorLauncher] Inicializando emulador...');
-        await devCpcEmulator.initEmulator(context);
-        
-        // Esperar a que esté listo si hay un binario para cargar
-        if (binaryPath) {
-            console.log('[EmulatorLauncher] Esperando 2 segundos para que el emulador esté listo...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-    } else {
-        console.log('[EmulatorLauncher] Emulador ya está activo');
+    // Si vamos a cargar un binario y el emulador se va a abrir ahora, bloquear la auto-carga al abrir.
+    if (binaryPath && !wasActiveBeforeLaunch) {
+        devCpcEmulator.setExternalLoadPending(true);
     }
-    
-    // Cargar el binario si se proporcionó
-    if (binaryPath) {
-        if (options?.resetBeforeLoad && devCpcEmulator.isEmulatorActive()) {
-            console.log('[EmulatorLauncher] Reset antes de run (integrated)');
-            devCpcEmulator.resetEmulator();
-            await new Promise(resolve => setTimeout(resolve, 250));
+
+    try {
+        // Inicializar el emulador si no está activo
+        if (!wasActiveBeforeLaunch) {
+            console.log('[EmulatorLauncher] Inicializando emulador...');
+            await devCpcEmulator.initEmulator(context);
+            
+            // Esperar a que esté listo si hay un binario para cargar
+            if (binaryPath) {
+                console.log('[EmulatorLauncher] Esperando 2 segundos para que el emulador esté listo...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        } else {
+            console.log('[EmulatorLauncher] Emulador ya está activo');
         }
-        console.log('[EmulatorLauncher] Cargando archivo:', binaryPath);
-        await devCpcEmulator.loadBinaryInEmulator(binaryPath);
-        const runFile = config['RUN_FILE'];
-        if (runFile) {
-            // Tras reset+load el firmware tarda más en aceptar teclado; si no, se comen los primeros chars.
-            const runFileDelayMs = options?.resetBeforeLoad ? 1200 : 400;
-            await new Promise(resolve => setTimeout(resolve, runFileDelayMs));
-            devCpcEmulator.sendRunFileToEmulator(runFile);
+
+        // Cargar el binario si se proporcionó
+        if (binaryPath) {
+            // Si el emulador ya estaba activo, ahora sí bloqueamos auto-run paralelo.
+            if (wasActiveBeforeLaunch) {
+                devCpcEmulator.setExternalLoadPending(true);
+            }
+
+            const shouldResetBeforeLoad = Boolean(options?.resetBeforeLoad && wasActiveBeforeLaunch);
+            if (shouldResetBeforeLoad) {
+                console.log('[EmulatorLauncher] Reset antes de run (integrated)');
+                devCpcEmulator.resetEmulator();
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
+            console.log('[EmulatorLauncher] Cargando archivo:', binaryPath);
+            await devCpcEmulator.loadBinaryInEmulator(binaryPath);
+            const runFile = config['RUN_FILE'];
+            const cpcModel = config['CPC_MODEL'];
+            const isCdt = path.extname(binaryPath).toLowerCase() === '.cdt';
+            console.log('[EmulatorLauncher] RUN_FILE from config:', runFile, '| CPC_MODEL:', cpcModel);
+            if (runFile || (cpcModel || '').trim() === '464' || isCdt) {
+                // Tras reset+load el firmware tarda más en aceptar teclado; si no, se comen los primeros chars.
+                const runFileDelayMs = shouldResetBeforeLoad ? 1200 : 600;
+                console.log('[EmulatorLauncher] Esperando', runFileDelayMs, 'ms antes de ejecutar RUN_FILE...');
+                await new Promise(resolve => setTimeout(resolve, runFileDelayMs));
+                devCpcEmulator.sendRunFileToEmulator(runFile, cpcModel, binaryPath);
+            } else {
+                console.log('[EmulatorLauncher] No RUN_FILE configurado en devcpc.conf');
+            }
+        } else {
+            console.log('[EmulatorLauncher] No hay archivo para cargar');
         }
-    } else {
-        console.log('[EmulatorLauncher] No hay archivo para cargar');
+    } finally {
+        if (binaryPath) {
+            devCpcEmulator.setExternalLoadPending(false);
+        }
     }
 }
 
