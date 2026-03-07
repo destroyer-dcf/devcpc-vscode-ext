@@ -1,0 +1,3 @@
+/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/emsc-ninja-release/CMakeFiles/hello.dir
+/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/emsc-ninja-release/CMakeFiles/edit_cache.dir
+/Users/destroyer/PROJECTS/CPCReady/devcpc-vscode-ext/chips-test/.fibs/config/emsc-ninja-release/CMakeFiles/rebuild_cache.dir

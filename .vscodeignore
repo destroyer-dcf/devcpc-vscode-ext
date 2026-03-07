@@ -7,3 +7,11 @@ src/**
 tsconfig.json
 vsc-extension-quickstart.md
 tslint.json
+node_modules/**
+test/**
+doc/**
+BASURA/**
+*.vsix
+*.tgz
+package-lock.json
+devcpc.conf

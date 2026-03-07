@@ -3,7 +3,7 @@
     "displayName": "DevCPC",
     "description": "VS Code extension to view and run DevCPC tasks from Explorer pane",
     "icon": "devcpc.png",
-    "version": "0.1.2",
+    "version": "0.1.6",
     "publisher": "devcpc",
     "repository": {
         "type": "git",
@@ -32,6 +32,15 @@
         "workspaceContains:**/.vscode/taskcpc.json"
     ],
     "main": "./out/extension",
+    "files": [
+        "out/**",
+        "assets/**",
+        "devcpc.png",
+        "README.md",
+        "CHANGELOG.md",
+        "LICENSE",
+        "package.json"
+    ],
     "contributes": {
         "views": {
             "explorer": [
