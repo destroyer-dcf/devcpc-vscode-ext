@@ -1,37 +1,50 @@
-# DevCPC Tasks for VS Code
+# DevCPC for VS Code
 
 ![Demo](https://raw.githubusercontent.com/destroyer-dcf/devcpc-vscode-ext/main/doc/extension.gif)
 
-VS Code extension to view and run DevCPC tasks directly from the Explorer pane.
+VS Code extension to work with DevCPC projects from inside the editor.
 
-This extension adds a "DevCPC" view to your Explorer panel, allowing you to visualize and execute DevCPC tasks configured in your project with a single click. Perfect for developing games and applications for Amstrad CPC.
+## What It Includes
 
-## Features
-
-- **Visual Task List**: See all available DevCPC tasks at a glance
-- **One-Click Execution**: Run any task directly from the Explorer panel
-- **Task Icons**: Visual indicators for different task types (build, clean, run, etc.)
-- **Composite Tasks Support**: Execute complex task chains with dependencies
-- **Auto-Refresh**: Automatically updates the task list when configuration changes
-- **Integrated CPC Emulator**: Built-in Amstrad CPC emulator powered by KC IDE
-- **Multi-Format Support**: Load `.bin`, `.sna`, `.dsk`, and `.cdt` (auto-load flow)
-- **Auto-Load After Build**: Automatically loads your program after successful compilation
-- **Configuration Management**: Visual editor for devcpc.conf with toggle buttons
+- **Project Setup view (DevCPC activity bar):**
+  - `Pick a folder` to open an existing project folder
+  - `Create New Project` to open a side wizard and generate a new DevCPC project
+- **DevCPC tasks view (Explorer):** run tasks from `.vscode/taskcpc.json`
+- **Integrated CPC emulator (KC CPC):** open, reset, focus, close, and load files
+- **Auto-load after build:** if task flow and config allow it, generated artifacts are loaded automatically
+- **Run in external emulator:** optional `RVM_PATH` support in `devcpc.conf`
 
 ## Requirements
 
-- [DevCPC](https://github.com/destroyer-dcf/DevCPC) installed on your system
-- VS Code 1.60.0 or higher
+- [DevCPC CLI](https://github.com/destroyer-dcf/DevCPC)
+- VS Code `1.60.0` or higher
 
 ## Installation
 
-1. Install the extension from the VS Code Marketplace
-2. Open a project with a `.vscode/taskcpc.json` file
-3. The DevCPC panel will appear in the Explorer sidebar
+1. Install the extension.
+2. Open a folder with a DevCPC project (or create one from `Project Setup`).
+3. Ensure your project has `.vscode/taskcpc.json` to use task execution in Explorer.
 
-## Configuration
+## Project Setup View
 
-Create a `.vscode/taskcpc.json` file in your project root with your DevCPC tasks:
+The DevCPC activity bar contains `Project Setup` with two actions:
+
+- **Pick a folder**
+  - Opens a folder picker.
+  - Lets you choose `Open Here` or `Open in New Window`.
+- **Create New Project**
+  - Opens a side wizard (`WebviewPanel`) with:
+    - Project name
+    - Project type template
+    - CPC model (`464`, `664`, `6128`)
+    - `PATH Retro Virtual Machine` file picker (optional)
+    - Default/custom destination folder
+
+When project creation finishes, the extension can open the generated folder.
+
+## Task Configuration
+
+Create `.vscode/taskcpc.json` in your project root:
 
 ```json
 {
@@ -61,125 +74,74 @@ Create a `.vscode/taskcpc.json` file in your project root with your DevCPC tasks
 }
 ```
 
-### Composite Tasks
+Composite tasks are supported using `dependsOn` and `dependsOrder`.
 
-You can create tasks that depend on other tasks:
+## Integrated Emulator
 
-```json
-{
-  "label": "DevCPC: Clean & Build",
-  "dependsOn": ["DevCPC: Clean", "DevCPC: Build"],
-  "dependsOrder": "sequence"
-}
-```
+Commands:
 
-## Usage
+- `DevCPC: Open Integrated Emulator`
+- `DevCPC: Reset Emulator`
+- `DevCPC: Focus Emulator`
+- `DevCPC: Close Emulator`
+- `DevCPC: Run File in Emulator`
 
-### Task Execution
+Supported load formats:
 
-1. Open a project with DevCPC configuration
-2. Find the **DevCPC** panel in the Explorer sidebar
-3. Click on any task to execute it
-4. Use the refresh button (⟳) to reload the task list
+- `.bin`
+- `.sna`
+- `.dsk`
+- `.cdt`
 
-### Integrated Emulator
+Implementation pieces:
 
-The extension includes a built-in Amstrad CPC emulator (KC CPC):
+- `media/shell.html`
+- `media/shell.js`
+- `media/cpc-ui.js`
+- `media/cpc-ui.wasm`
+- `src/devCpcEmulator.ts`
+- `src/emulatorLauncher.ts`
 
-1. **Open Emulator**: Use command "DevCPC: Open Integrated Emulator"
-2. **Auto-Load on Open**: if `devcpc.conf` exists in workspace root and output file exists, it is loaded automatically
-3. **Auto-Load After Build**: from `taskcpc.json` build flow, extension can prompt and load generated output
-4. **Supported file types**:
-   - `.bin`
-   - `.sna`
-   - `.dsk`
-   - `.cdt` (auto-load path)
-5. **Controls**:
-   - `DevCPC: Reset Emulator`
-   - `DevCPC: Focus Emulator`
-   - `DevCPC: Close Emulator`
-   - `DevCPC: Run File in Emulator`
+## `devcpc.conf` Runtime Behavior
 
-### Emulator Implementation Details
+The extension reads `devcpc.conf` from workspace context for emulator/runtime decisions.
 
-The integrated emulator is a VS Code WebView using:
+### `CPC_MODEL`
 
-- `media/shell.html` as host page
-- `media/shell.js` as command bridge (`boot`, `reset`, `load`, `load_dsk`, `input`, debug commands)
-- `media/cpc-ui.js` + `media/cpc-ui.wasm` as KC CPC runtime
-- `src/devCpcEmulator.ts` and `src/emulatorLauncher.ts` as extension-side orchestration
+- `6128`: default behavior
+- `464`: prefers `CDT` over `DSK` in auto-selection
+- `664`: currently falls back to `6128` behavior
 
-#### Config source
-
-- `devcpc.conf` is read from the **workspace root**.
-
-#### CPC model selection (`CPC_MODEL`)
-
-- `CPC_MODEL=6128` -> default runtime mode
-- `CPC_MODEL=464` -> runtime starts in CPC 464 mode
-- `CPC_MODEL=664` -> currently falls back to 6128 with warning
-
-#### Auto-load priority
+### Auto-load priority
 
 - For `CPC_MODEL=464`: `CDT -> DSK -> BIN`
 - For other models: `DSK -> CDT -> BIN`
 
-#### Auto run command (`RUN_FILE`)
+### `RUN_FILE`
 
-After loading a file, the extension can auto-send input to emulator:
+After loading an artifact, the extension can auto-send a run command to emulator.
 
-- If `RUN_FILE` is a filename, it sends `run"<RUN_FILE>`
-- If `RUN_FILE` already looks like a command (`|cpm`, `run"disc`, `call ...`), it sends it as-is
-- `\n`, `\r`, `\t` escapes are supported
-- Duplicate automatic sends are debounced to avoid double execution in quick open/run sequences
+### External emulator
 
-### Configuration Management
+Use in `devcpc.conf`:
 
-Edit your `devcpc.conf` visually:
-
-1. Open the **DevCPC Config** panel in Explorer
-2. Click toggles to enable/disable variables
-3. Double-click values to edit them
-4. Variables are automatically created when toggled
-
-### Emulator Selection
-
-Configure `EMULATOR_TYPE` in your `devcpc.conf`:
-
-```
-EMULATOR_TYPE = integrated  # Use built-in KC CPC emulator
-# EMULATOR_TYPE = rvm       # Use RetroVirtualMachine (requires RVM_PATH)
+```conf
+EMULATOR_TYPE=integrated
+# EMULATOR_TYPE=rvm
+# RVM_PATH="/path/to/RetroVirtualMachine"
 ```
 
-## Task Icons
+## Known Notes
 
-Tasks are automatically assigned icons based on their names:
+- The Explorer view now focuses on **tasks only** (`DevCPC`).
+- Project setup and creation are handled in the DevCPC activity bar `Project Setup` view.
 
-- 🔧 **Build** tasks
-- 🗑️ **Clean** tasks
-- ▶️ **Run** tasks
-- ℹ️ **Info** tasks
-- ✓ **Validate** tasks
-- ❓ **Help** tasks
-- 🏷️ **Version** tasks
+## Issues
 
-## Known Issues
+Report issues here:
 
-Please report issues at: https://github.com/destroyer-dcf/devcpc-vscode-ext/issues
-
-## Release Notes
-
-### 0.1.0
-
-- Initial release
-- Support for taskcpc.json configuration
-- Visual task list with icons
-- Composite task execution with dependencies
+- https://github.com/destroyer-dcf/devcpc-vscode-ext/issues
 
 ## License
 
 MIT
-
----
-
-**Enjoy coding for Amstrad CPC with DevCPC!**

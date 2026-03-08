@@ -3,8 +3,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawn, execSync } from 'child_process';
 import * as devCpcEmulator from './devCpcEmulator';
-import { ConfigValues, findConfigFileInWorkspace, parseConfigFile } from './configUtils';
+import { ConfigValues, findConfigFileInWorkspace, parseConfigFile, resolveConfigPath } from './configUtils';
 
 interface LaunchOptions {
     resetBeforeLoad?: boolean;
@@ -186,4 +187,77 @@ export async function runInEmulator(context: vscode.ExtensionContext, filePath?:
     }
 
     await launchEmulator(context, binaryPath);
+}
+
+/**
+ * Lanzar RVM directamente con un modelo CPC específico,
+ * usando la ruta configurada en los settings de VS Code (devcpc.rvm.path).
+ */
+export async function launchRvmWithModel(context: vscode.ExtensionContext, model: '464' | '664' | '6128'): Promise<void> {
+    const settings = vscode.workspace.getConfiguration('devcpc');
+    const rvmPath = settings.get<string>('rvm.path', '').trim();
+    const killExisting = settings.get<boolean>('rvm.killExistingInstance', true);
+
+    if (!rvmPath) {
+        const answer = await vscode.window.showErrorMessage(
+            'No se ha configurado la ruta de Retro Virtual Machine.',
+            'Abrir Configuración'
+        );
+        if (answer === 'Abrir Configuración') {
+            await vscode.commands.executeCommand('workbench.action.openSettings', 'devcpc.rvm.path');
+        }
+        return;
+    }
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const configPath = workspaceFolder ? findConfigFileInWorkspace(workspaceFolder.uri.fsPath) : undefined;
+    const workspaceConfig: ConfigValues = configPath ? parseConfigFile(configPath) : {};
+
+    // Para 464 preferir CDT, para el resto DSK
+    const preferCdt = model === '464';
+    const distDir = workspaceConfig.DIST_DIR && configPath
+        ? resolveConfigPath(configPath, workspaceConfig.DIST_DIR)
+        : undefined;
+
+    let binaryPath: string | undefined;
+
+    if (preferCdt && distDir && workspaceConfig.CDT) {
+        const cdtPath = path.join(distDir, workspaceConfig.CDT);
+        if (fs.existsSync(cdtPath)) { binaryPath = cdtPath; }
+    }
+    if (!binaryPath && distDir && workspaceConfig.DSK) {
+        const dskPath = path.join(distDir, workspaceConfig.DSK);
+        if (fs.existsSync(dskPath)) { binaryPath = dskPath; }
+    }
+    if (!binaryPath && distDir && workspaceConfig.CDT) {
+        const cdtPath = path.join(distDir, workspaceConfig.CDT);
+        if (fs.existsSync(cdtPath)) { binaryPath = cdtPath; }
+    }
+
+    const args = [`-b=cpc${model}`];
+
+    if (killExisting) {
+        try {
+            if (process.platform === 'win32') {
+                const execName = path.basename(rvmPath);
+                execSync(`taskkill /F /IM "${execName}" /T 2>nul`, { shell: 'cmd.exe', stdio: 'pipe' });
+            } else {
+                // pkill -9 -f busca por ruta completa en la línea de comandos del proceso
+                execSync(`pkill -9 -f "${rvmPath}"`, { stdio: 'pipe' });
+            }
+            // Delay para que el SO libere recursos antes de relanzar
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (_) {
+            // No había instancia previa, ignorar
+        }
+    }
+
+    const child = spawn(rvmPath, args, {
+        detached: true,
+        stdio: 'ignore',
+        cwd: workspaceFolder?.uri.fsPath
+    });
+    child.unref();
+
+    vscode.window.showInformationMessage(`Lanzando RVM con CPC ${model}${binaryPath ? '' : ' (sin archivo)'}...`);
 }

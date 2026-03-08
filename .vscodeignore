@@ -15,14 +15,12 @@ doc/**
 .git/**
 .github/**
 node_modules/**
-*.yml
 *.cmd
 test-wasm-functions.js
 CHANGELOG.md
 DSK_STATUS.md
 DSK_SUPPORT.md
 QUICK_TEST_DSK.md
-vars.yml
 webpack.config.js
 .eslintrc.json
 .DS_Store

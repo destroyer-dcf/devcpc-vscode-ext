@@ -1,7 +1,9 @@
 'use strict';
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 export interface ConfigValues {
     [key: string]: string | undefined;
@@ -100,4 +102,15 @@ export function resolveConfigPath(baseConfigPath: string, configPathValue: strin
 export function findConfigFileInWorkspace(rootPath: string): string | undefined {
     const configPath = path.join(rootPath, 'devcpc.conf');
     return fs.existsSync(configPath) ? configPath : undefined;
+}
+
+/**
+ * Devuelve la ruta de instalación del software DevCPC.
+ * Si el usuario ha configurado `devcpc.software.installPath`, se usa ese valor.
+ * En caso contrario, se utiliza `~/.DevCPC` como directorio por defecto.
+ */
+export function getDevCpcInstallPath(): string {
+    const settings = vscode.workspace.getConfiguration('devcpc');
+    const configured = settings.get<string>('software.installPath', '').trim();
+    return configured || path.join(os.homedir(), '.DevCPC');
 }
