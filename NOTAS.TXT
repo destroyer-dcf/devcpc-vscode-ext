@@ -1,0 +1,1 @@
+Sí, se puede. Voy a cambiar Create New Project para que abra una vista lateral (WebviewPanel) con formulario: Project Name + combo Project Type, y desde ahí lanzar la creación. Ahora edito src/extension.ts y lo dejo funcionando end-to-end.

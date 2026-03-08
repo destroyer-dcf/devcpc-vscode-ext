@@ -3,7 +3,7 @@
     "displayName": "DevCPC",
     "description": "VS Code extension to view and run DevCPC tasks from Explorer pane",
     "icon": "devcpc.png",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "publisher": "devcpc",
     "repository": {
         "type": "git",
@@ -12,6 +12,7 @@
     "engines": {
         "vscode": "^1.60.0"
     },
+    "os": ["darwin", "linux"],
     "categories": [
         "Other"
     ],
@@ -26,8 +27,9 @@
         "color": "#d7ede1"
     },
     "activationEvents": [
+        "onStartupFinished",
+        "onView:devcpcProjectStart",
         "onView:devcpcTasks",
-        "onView:devcpcConfig",
         "workspaceContains:**/devcpc.conf",
         "workspaceContains:**/.vscode/taskcpc.json"
     ],
@@ -42,18 +44,94 @@
         "package.json"
     ],
     "contributes": {
+        "configuration": {
+            "title": "DevCPC",
+            "properties": {
+                "devcpc.rvm.path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Ruta al ejecutable de Retro Virtual Machine (RVM)"
+                },
+                "devcpc.rvm.killExistingInstance": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Terminate any existing RVM process instance before spawning a new one"
+                },
+                "devcpc.software.installPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Absolute path to the DevCPC software installation directory. Defaults to ~/.DevCPC if left empty"
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "devcpcProjectSidebar",
+                    "title": "DevCPC",
+                    "icon": "assets/-b=cpc664"
+                }
+            ]
+        },
+        "languages": [
+            {
+                "id": "devcpc-conf",
+                "aliases": [
+                    "DevCPC Config",
+                    "devcpc"
+                ],
+                "extensions": [
+                    ".conf"
+                ],
+                "filenames": [
+                    "devcpc.conf"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "devcpc-conf",
+                "scopeName": "source.devcpc-conf",
+                "path": "./syntaxes/devcpc-conf.tmLanguage.json"
+            }
+        ],
+        "jsonValidation": [
+            {
+                "fileMatch": "devcpc.conf",
+                "url": "./schemas/devcpc-config.schema.json"
+            }
+        ],
         "views": {
+            "devcpcProjectSidebar": [
+                {
+                    "id": "devcpcProjectStart",
+                    "name": "Project Setup"
+                }
+            ],
             "explorer": [
                 {
                     "id": "devcpcTasks",
                     "name": "DevCPC"
-                },
-                {
-                    "id": "devcpcConfig",
-                    "name": "DevCPC Config"
                 }
             ]
         },
+        "viewsWelcome": [
+            {
+                "view": "devcpcProjectStart",
+                "contents": "You have not yet opened a DevCPC project.\n\nYou can open an existing DevCPC-based project folder.\n\n[Pick a folder](command:devcpcProject.pickFolder)\n\nYou can create a new DevCPC project.\n\n[Create New Project](command:devcpcProject.createNewProject)"
+            }
+        ],
+        "submenus": [
+            {
+                "id": "devcpc.emulador.menu",
+                "label": "Emulador"
+            },
+            {
+                "id": "devcpc.emulador.rvm.menu",
+                "label": "Retro Virtual Machine"
+            }
+        ],
         "commands": [
             {
                 "command": "devcpcTasks.executeTask",
@@ -65,39 +143,159 @@
                 "icon": "assets/refresh_icon.svg"
             },
             {
-                "command": "devcpc.editConfigVariable",
-                "title": "Editar Variable",
-                "icon": "$(edit)"
+                "command": "devcpc.openIntegratedEmulator",
+                "category": "DevCPC",
+                "title": "Open Integrated Emulator",
+                "icon": "$(device-desktop)"
             },
             {
-                "command": "devcpc.toggleConfigVariable",
-                "title": "Habilitar/Deshabilitar",
-                "icon": "$(circle-slash)"
+                "command": "devcpc.resetEmulator",
+                "category": "DevCPC",
+                "title": "Reset Emulator"
             },
             {
-                "command": "devcpc.refreshConfig",
-                "title": "Refrescar Configuración",
-                "icon": "$(refresh)"
+                "command": "devcpc.focusEmulator",
+                "category": "DevCPC",
+                "title": "Focus Emulator"
+            },
+            {
+                "command": "devcpc.closeEmulator",
+                "category": "DevCPC",
+                "title": "Close Emulator"
+            },
+            {
+                "command": "devcpc.launchEmulator",
+                "category": "DevCPC",
+                "title": "Launch Emulator (Auto-detect)",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devcpc.launchRvm",
+                "category": "DevCPC",
+                "title": "Launch RetroVirtualMachine",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devcpc.setEmulatorTypeRvm",
+                "category": "DevCPC",
+                "title": "Set Emulator Type: RVM"
+            },
+            {
+                "command": "devcpc.setRvmPath",
+                "category": "DevCPC",
+                "title": "Set RVM Path..."
+            },
+            {
+                "command": "devcpc.setCpcModel464",
+                "category": "DevCPC",
+                "title": "464"
+            },
+            {
+                "command": "devcpc.setCpcModel664",
+                "category": "DevCPC",
+                "title": "664"
+            },
+            {
+                "command": "devcpc.setCpcModel6128",
+                "category": "DevCPC",
+                "title": "6128"
+            },
+            {
+                "command": "devcpc.runInEmulator",
+                "category": "DevCPC",
+                "title": "Run File in Emulator",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devcpcTasks.runTask",
+                "title": "Run Task",
+                "icon": "$(run)"
+            },
+            {
+                "command": "devcpcProject.createNewProject",
+                "category": "DevCPC",
+                "title": "Create New Project",
+                "icon": "$(add)"
+            },
+            {
+                "command": "devcpcProject.pickFolder",
+                "category": "DevCPC",
+                "title": "Pick a folder",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "devcpcProject.refresh",
+                "category": "DevCPC",
+                "title": "Refresh Project Setup",
+                "icon": "assets/refresh_icon.svg"
+            },
+            {
+                "command": "devcpc.rvm.launch464",
+                "category": "DevCPC",
+                "title": "464"
+            },
+            {
+                "command": "devcpc.rvm.launch664",
+                "category": "DevCPC",
+                "title": "664"
+            },
+            {
+                "command": "devcpc.rvm.launch6128",
+                "category": "DevCPC",
+                "title": "6128"
             }
         ],
         "menus": {
+            "editor/title/run": [
+                {
+                    "submenu": "devcpc.emulador.menu",
+                    "group": "navigation@10"
+                }
+            ],
+            "devcpc.emulador.menu": [
+                {
+                    "submenu": "devcpc.emulador.rvm.menu",
+                    "group": "1_rvm@1"
+                }
+            ],
+            "devcpc.emulador.rvm.menu": [
+                {
+                    "command": "devcpc.rvm.launch464",
+                    "group": "1_models@1"
+                },
+                {
+                    "command": "devcpc.rvm.launch664",
+                    "group": "1_models@2"
+                },
+                {
+                    "command": "devcpc.rvm.launch6128",
+                    "group": "1_models@3"
+                }
+            ],
             "view/title": [
                 {
-                    "command": "devcpcTasks.refresh",
-                    "when": "view == devcpcTasks",
+                    "command": "devcpcProject.refresh",
+                    "when": "view == devcpcProjectStart",
                     "group": "navigation"
                 },
                 {
-                    "command": "devcpc.refreshConfig",
-                    "when": "view == devcpcConfig",
+                    "command": "devcpcTasks.refresh",
+                    "when": "view == devcpcTasks",
                     "group": "navigation"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "devcpc.toggleConfigVariable",
-                    "when": "view == devcpcConfig && viewItem == configVariable",
+                    "command": "devcpcTasks.runTask",
+                    "when": "view == devcpcTasks && viewItem == task",
                     "group": "inline"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "devcpc.runInEmulator",
+                    "when": "resourceExtname == .bin || resourceExtname == .dsk || resourceExtname == .cdt || resourceExtname == .sna",
+                    "group": "devcpc"
                 }
             ]
         }
@@ -108,14 +306,10 @@
         "watch": "tsc -watch -p ./"
     },
     "devDependencies": {
-        "@types/js-yaml": "^4.0.9",
         "@types/mocha": "^2.2.42",
         "@types/node": "^16.x",
         "@types/vscode": "^1.60.0",
         "tslint": "^5.8.0",
         "typescript": "^4.5.0"
-    },
-    "dependencies": {
-        "js-yaml": "^4.1.1"
     }
 }

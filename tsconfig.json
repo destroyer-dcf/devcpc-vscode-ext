@@ -20,6 +20,8 @@
     "exclude": [
         "node_modules",
         ".vscode-test",
-        "src/test"
+        "src/test",
+        "BASURA/vscode-kcide-main",
+        "BASURA/chips-test"
     ]
 }
