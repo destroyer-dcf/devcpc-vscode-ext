@@ -4,47 +4,63 @@
 
 VS Code extension to work with DevCPC projects from inside the editor.
 
+## Platform Support
+
+> **macOS · Linux · WSL** — Windows native is **not** supported.
+
 ## What It Includes
 
-- **Project Setup view (DevCPC activity bar):**
-  - `Pick a folder` to open an existing project folder
-  - `Create New Project` to open a side wizard and generate a new DevCPC project
-- **DevCPC tasks view (Explorer):** run tasks from `.vscode/taskcpc.json`
-- **Integrated CPC emulator (KC CPC):** open, reset, focus, close, and load files
-- **Auto-load after build:** if task flow and config allow it, generated artifacts are loaded automatically
-- **Run in external emulator:** optional `RVM_PATH` support in `devcpc.conf`
+- **Project Setup view** (DevCPC activity bar, left sidebar):
+  - Open an existing project folder
+  - Create a new DevCPC project with a guided wizard
+- **DevCPC tasks view** (Explorer): run tasks defined in `.vscode/taskcpc.json`
+- **Retro Virtual Machine (RVM)** launcher: launch RVM for a specific CPC model directly from the editor toolbar
 
 ## Requirements
 
 - [DevCPC CLI](https://github.com/destroyer-dcf/DevCPC)
 - VS Code `1.60.0` or higher
+- macOS, Linux or WSL
+
+---
 
 ## Installation
 
-1. Install the extension.
-2. Open a folder with a DevCPC project (or create one from `Project Setup`).
-3. Ensure your project has `.vscode/taskcpc.json` to use task execution in Explorer.
+1. Install the extension from the Marketplace or from a `.vsix` file.
+2. Open a folder that contains a DevCPC project, or create one from the `Project Setup` sidebar.
+3. Add `.vscode/taskcpc.json` to your project to enable task execution from the Explorer panel.
 
-## Project Setup View
+---
 
-The DevCPC activity bar contains `Project Setup` with two actions:
+## Project Setup — Left Sidebar
 
-- **Pick a folder**
-  - Opens a folder picker.
-  - Lets you choose `Open Here` or `Open in New Window`.
-- **Create New Project**
-  - Opens a side wizard (`WebviewPanel`) with:
-    - Project name
-    - Project type template
-    - CPC model (`464`, `664`, `6128`)
-    - `PATH Retro Virtual Machine` file picker (optional)
-    - Default/custom destination folder
+The **DevCPC** icon in the VS Code activity bar (left sidebar) opens the **Project Setup** panel. It provides two actions:
 
-When project creation finishes, the extension can open the generated folder.
+### Open existing project
 
-## Task Configuration
+Click **Pick a folder** to browse for an existing DevCPC project directory. A dialog will ask whether to open it in the current window or in a new VS Code window.
 
-Create `.vscode/taskcpc.json` in your project root:
+### Create a new project
+
+Click **Create New Project** to open the creation wizard as a side panel. Fill in:
+
+| Field | Description |
+|---|---|
+| **Project name** | Name of the new project directory |
+| **Project type** | Template to use (e.g. `Basic`, `C`, …) |
+| **CPC model** | Target machine: `464`, `664` or `6128` |
+| **RVM path** *(optional)* | Path to the Retro Virtual Machine executable |
+| **Destination folder** | Where the project will be created |
+
+Once confirmed, the CLI scaffolds the project and the extension offers to open the generated folder immediately.
+
+---
+
+## Task Execution — Explorer Panel
+
+The **DevCPC** section in the Explorer panel lists all tasks defined in `.vscode/taskcpc.json`. Click any task to run it in the integrated terminal.
+
+Example `taskcpc.json`:
 
 ```json
 {
@@ -74,73 +90,55 @@ Create `.vscode/taskcpc.json` in your project root:
 }
 ```
 
-Composite tasks are supported using `dependsOn` and `dependsOrder`.
+Composite tasks with `dependsOn` / `dependsOrder` are fully supported.
 
-## Integrated Emulator
+---
 
-Commands:
+## Retro Virtual Machine (RVM) Launcher
 
-- `DevCPC: Open Integrated Emulator`
-- `DevCPC: Reset Emulator`
-- `DevCPC: Focus Emulator`
-- `DevCPC: Close Emulator`
-- `DevCPC: Run File in Emulator`
+A menu in the editor toolbar (`▶ DevCPC → Emulador → Retro Virtual Machine`) lets you launch RVM for a specific CPC model without leaving VS Code.
 
-Supported load formats:
+### How to use
 
-- `.bin`
-- `.sna`
-- `.dsk`
-- `.cdt`
+1. Configure the path to the RVM executable in VS Code settings (`devcpc.rvm.path`).
+2. Open any file inside a DevCPC project.
+3. Click the **▶** button in the editor title bar and navigate to **DevCPC → Emulador → Retro Virtual Machine**.
+4. Choose the target model: **464**, **664** or **6128**.
 
-Implementation pieces:
+The extension will:
+- Optionally terminate any running RVM instance (see `devcpc.rvm.killExistingInstance`).
+- Spawn RVM as a detached, fire-and-forget process with the `-b=cpcXXX` argument.
 
-- `media/shell.html`
-- `media/shell.js`
-- `media/cpc-ui.js`
-- `media/cpc-ui.wasm`
-- `src/devCpcEmulator.ts`
-- `src/emulatorLauncher.ts`
+### VS Code Settings
 
-## `devcpc.conf` Runtime Behavior
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `devcpc.rvm.path` | string | `""` | Absolute path to the RVM executable |
+| `devcpc.rvm.killExistingInstance` | boolean | `true` | Terminate any running RVM instance before starting a new one |
+| `devcpc.software.installPath` | string | `""` | Absolute path to the DevCPC software installation directory. Defaults to `~/.DevCPC` if left empty |
 
-The extension reads `devcpc.conf` from workspace context for emulator/runtime decisions.
+---
 
-### `CPC_MODEL`
+## `devcpc.conf` Reference
 
-- `6128`: default behavior
-- `464`: prefers `CDT` over `DSK` in auto-selection
-- `664`: currently falls back to `6128` behavior
-
-### Auto-load priority
-
-- For `CPC_MODEL=464`: `CDT -> DSK -> BIN`
-- For other models: `DSK -> CDT -> BIN`
-
-### `RUN_FILE`
-
-After loading an artifact, the extension can auto-send a run command to emulator.
-
-### External emulator
-
-Use in `devcpc.conf`:
+The extension reads `devcpc.conf` from the workspace root to drive emulator and runtime decisions.
 
 ```conf
-EMULATOR_TYPE=integrated
-# EMULATOR_TYPE=rvm
-# RVM_PATH="/path/to/RetroVirtualMachine"
+# Target CPC model: 464 | 664 | 6128
+CPC_MODEL=6128
+
+# File to run after loading (omit for tape load on CPC 464)
+RUN_FILE=mygame.bas
+
+# Emulator type: integrated | rvm
+EMULATOR_TYPE=rvm
 ```
 
-## Known Notes
-
-- The Explorer view now focuses on **tasks only** (`DevCPC`).
-- Project setup and creation are handled in the DevCPC activity bar `Project Setup` view.
+---
 
 ## Issues
 
-Report issues here:
-
-- https://github.com/destroyer-dcf/devcpc-vscode-ext/issues
+Report issues at: https://github.com/destroyer-dcf/devcpc-vscode-ext/issues
 
 ## License
 
